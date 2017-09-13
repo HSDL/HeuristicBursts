@@ -1,0 +1,369 @@
+backend: theano
+class_name: Model
+config:
+  input_layers:
+  - [input_1, 0, 0]
+  layers:
+  - class_name: InputLayer
+    config:
+      batch_input_shape: !!python/tuple
+      - null
+      - &id001 !!python/object/apply:numpy.core.multiarray._reconstruct
+        args:
+        - !!python/name:numpy.ndarray ''
+        - !!python/tuple [0]
+        - !!binary |
+          Yg==
+        state: !!python/tuple
+        - 1
+        - !!python/tuple []
+        - !!python/object/apply:numpy.dtype
+          args: [i8, 0, 1]
+          state: !!python/tuple [3, <, null, null, null, -1, -1, 0]
+        - false
+        - !!binary |
+          IAAAAAAAAAA=
+      - *id001
+      - *id001
+      - 1
+      dtype: float32
+      name: input_1
+      sparse: false
+    inbound_nodes: []
+    name: input_1
+  - class_name: Conv3D
+    config:
+      activation: relu
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: &id003 !!python/tuple [1, 1, 1]
+      filters: 16
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: VarianceScaling
+        config: {distribution: uniform, mode: fan_avg, scale: 1.0, seed: null}
+      kernel_regularizer: null
+      kernel_size: !!python/tuple [3, 3, 3]
+      name: VoxEncoder_C1
+      padding: same
+      strides: &id004 !!python/tuple [1, 1, 1]
+      trainable: false
+      use_bias: true
+    inbound_nodes:
+    - - - input_1
+        - 0
+        - 0
+        - {}
+    name: VoxEncoder_C1
+  - class_name: MaxPooling3D
+    config:
+      data_format: channels_last
+      name: VoxEncoder_M1
+      padding: valid
+      pool_size: &id002 !!python/tuple [2, 2, 2]
+      strides: *id002
+      trainable: false
+    inbound_nodes:
+    - - - VoxEncoder_C1
+        - 0
+        - 0
+        - {}
+    name: VoxEncoder_M1
+  - class_name: Conv3D
+    config:
+      activation: relu
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: *id003
+      filters: 8
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: VarianceScaling
+        config: {distribution: uniform, mode: fan_avg, scale: 1.0, seed: null}
+      kernel_regularizer: null
+      kernel_size: !!python/tuple [3, 3, 3]
+      name: VoxEncoder_C2
+      padding: same
+      strides: *id004
+      trainable: false
+      use_bias: true
+    inbound_nodes:
+    - - - VoxEncoder_M1
+        - 0
+        - 0
+        - {}
+    name: VoxEncoder_C2
+  - class_name: MaxPooling3D
+    config:
+      data_format: channels_last
+      name: VoxEncoder_M2
+      padding: valid
+      pool_size: &id005 !!python/tuple [2, 2, 2]
+      strides: *id005
+      trainable: false
+    inbound_nodes:
+    - - - VoxEncoder_C2
+        - 0
+        - 0
+        - {}
+    name: VoxEncoder_M2
+  - class_name: Conv3D
+    config:
+      activation: relu
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      data_format: channels_last
+      dilation_rate: *id003
+      filters: 4
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: VarianceScaling
+        config: {distribution: uniform, mode: fan_avg, scale: 1.0, seed: null}
+      kernel_regularizer: null
+      kernel_size: !!python/tuple [3, 3, 3]
+      name: VoxEncoder_C3
+      padding: same
+      strides: *id004
+      trainable: false
+      use_bias: true
+    inbound_nodes:
+    - - - VoxEncoder_M2
+        - 0
+        - 0
+        - {}
+    name: VoxEncoder_C3
+  - class_name: MaxPooling3D
+    config:
+      data_format: channels_last
+      name: VoxEncoder_M3
+      padding: valid
+      pool_size: &id006 !!python/tuple [2, 2, 2]
+      strides: *id006
+      trainable: false
+    inbound_nodes:
+    - - - VoxEncoder_C3
+        - 0
+        - 0
+        - {}
+    name: VoxEncoder_M3
+  - class_name: Flatten
+    config: {name: flatten_1, trainable: true}
+    inbound_nodes:
+    - - - VoxEncoder_M3
+        - 0
+        - 0
+        - {}
+    name: flatten_1
+  - class_name: Dense
+    config:
+      activation: relu
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: VarianceScaling
+        config: {distribution: uniform, mode: fan_avg, scale: 1.0, seed: null}
+      kernel_regularizer: null
+      name: dense_1
+      trainable: true
+      units: 128
+      use_bias: true
+    inbound_nodes:
+    - - - flatten_1
+        - 0
+        - 0
+        - {}
+    name: dense_1
+  - class_name: Dense
+    config:
+      activation: relu
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: VarianceScaling
+        config: {distribution: uniform, mode: fan_avg, scale: 1.0, seed: null}
+      kernel_regularizer: null
+      name: dense_2
+      trainable: true
+      units: 64
+      use_bias: true
+    inbound_nodes:
+    - - - dense_1
+        - 0
+        - 0
+        - {}
+    name: dense_2
+  - class_name: Reshape
+    config:
+      name: reshape_1
+      target_shape: !!python/tuple [8, 8]
+      trainable: true
+    inbound_nodes:
+    - - - dense_2
+        - 0
+        - 0
+        - {}
+    name: reshape_1
+  - class_name: UpSampling1D
+    config: {name: CurveDecoder_U1, size: 2, trainable: false}
+    inbound_nodes:
+    - - - reshape_1
+        - 0
+        - 0
+        - {}
+    name: CurveDecoder_U1
+  - class_name: Conv1D
+    config:
+      activation: relu
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      dilation_rate: !!python/tuple [1]
+      filters: 8
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: VarianceScaling
+        config: {distribution: uniform, mode: fan_avg, scale: 1.0, seed: null}
+      kernel_regularizer: null
+      kernel_size: !!python/tuple [3]
+      name: CurveDecoder_C1
+      padding: same
+      strides: !!python/tuple [1]
+      trainable: false
+      use_bias: true
+    inbound_nodes:
+    - - - CurveDecoder_U1
+        - 0
+        - 0
+        - {}
+    name: CurveDecoder_C1
+  - class_name: UpSampling1D
+    config: {name: CurveDecoder_U2, size: 2, trainable: false}
+    inbound_nodes:
+    - - - CurveDecoder_C1
+        - 0
+        - 0
+        - {}
+    name: CurveDecoder_U2
+  - class_name: Conv1D
+    config:
+      activation: relu
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      dilation_rate: !!python/tuple [1]
+      filters: 8
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: VarianceScaling
+        config: {distribution: uniform, mode: fan_avg, scale: 1.0, seed: null}
+      kernel_regularizer: null
+      kernel_size: !!python/tuple [3]
+      name: CurveDecoder_C2
+      padding: same
+      strides: !!python/tuple [1]
+      trainable: false
+      use_bias: true
+    inbound_nodes:
+    - - - CurveDecoder_U2
+        - 0
+        - 0
+        - {}
+    name: CurveDecoder_C2
+  - class_name: UpSampling1D
+    config: {name: CurveDecoder_U3, size: 2, trainable: false}
+    inbound_nodes:
+    - - - CurveDecoder_C2
+        - 0
+        - 0
+        - {}
+    name: CurveDecoder_U3
+  - class_name: Conv1D
+    config:
+      activation: relu
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      dilation_rate: !!python/tuple [1]
+      filters: 16
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: VarianceScaling
+        config: {distribution: uniform, mode: fan_avg, scale: 1.0, seed: null}
+      kernel_regularizer: null
+      kernel_size: !!python/tuple [8]
+      name: CurveDecoder_C3
+      padding: same
+      strides: !!python/tuple [1]
+      trainable: false
+      use_bias: true
+    inbound_nodes:
+    - - - CurveDecoder_U3
+        - 0
+        - 0
+        - {}
+    name: CurveDecoder_C3
+  - class_name: Conv1D
+    config:
+      activation: linear
+      activity_regularizer: null
+      bias_constraint: null
+      bias_initializer:
+        class_name: Zeros
+        config: {}
+      bias_regularizer: null
+      dilation_rate: !!python/tuple [1]
+      filters: 3
+      kernel_constraint: null
+      kernel_initializer:
+        class_name: VarianceScaling
+        config: {distribution: uniform, mode: fan_avg, scale: 1.0, seed: null}
+      kernel_regularizer: null
+      kernel_size: !!python/tuple [8]
+      name: CurveDecoderC4
+      padding: same
+      strides: !!python/tuple [1]
+      trainable: false
+      use_bias: true
+    inbound_nodes:
+    - - - CurveDecoder_C3
+        - 0
+        - 0
+        - {}
+    name: CurveDecoderC4
+  name: model_1
+  output_layers:
+  - [CurveDecoderC4, 0, 0]
+keras_version: 2.0.5
