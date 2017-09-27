@@ -4,7 +4,7 @@ import numpy as np
 
 class Agent(object):
 
-    def __init__(self, idx):
+    def __init__(self):
         self.current_solution = Solution()
         self.metrics = []
         self.weights = [1/3., 1/3., 1/3.]

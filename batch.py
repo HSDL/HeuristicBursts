@@ -1,15 +1,14 @@
-from agent import Agent
+from team import Team
 import os as os
 
 
 class Batch(object):
 
-    def __init__(self, solution_class):
+    def __init__(self, solution_class, number_of_agents, number_of_teams):
         self._print_solution_class(solution_class)
-
-    def run_agents(self, n):
-        for i in range(n):
-            temp = Agent(i)
+        self.team_list = []
+        for i in range(number_of_teams):
+            self.team_list.append(Team(number_of_agents))
 
     @staticmethod
     def _print_solution_class(solution_class):

@@ -2,12 +2,6 @@ import wec
 import time as time
 import matplotlib.pyplot as pp
 
-# Instantiate a device and set simulation parameters
-# wec.WEC.simulation_dt = 0.1
-# wec.WEC.simulation_steps = 5000
-# wec.WEC.error_bias = 0.02
-# wec.WEC.forces.load_model('./data/full_network_structure.yml', './data/full_network_weights.h5')
-
 # Create two bodies and a PTO
 device = wec.WEC()
 device.add_body('sphere', 651.2, (0, 0.0), radius=3)
