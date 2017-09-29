@@ -1,8 +1,10 @@
-import pymunk as pm
 import numpy as np
-from utils import excitation_forces as ef
-from utils import spectrum as sp
-from abstract_base_solution import AbstractBaseSolution
+import pymunk as pm
+
+from heuristic_bursts.abstract_base_solution import AbstractBaseSolution
+
+import wec.spectrum as sp
+import wec.excitation_forces as ef
 
 
 class WEC(AbstractBaseSolution):
@@ -11,7 +13,7 @@ class WEC(AbstractBaseSolution):
     error_bias = 0.02
     spectrum = sp.Spectrum('bretschneider', fp=0.5, Hm0=2)
     forces = ef.ExcitationForces()
-    forces.load_model('./data/full_network_structure.yml', './data/full_network_weights.h5')
+    forces.load_model('./wec/data/full_network_structure.yml', './wec/data/full_network_weights.h5')
     rho_w = 1000
     gravity = -9.81
     number_of_metrics = 3
