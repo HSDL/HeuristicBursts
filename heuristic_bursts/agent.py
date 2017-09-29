@@ -1,5 +1,5 @@
-from solution import Solution
 import numpy as np
+from heuristic_bursts.solution import Solution
 
 
 class Agent(object):

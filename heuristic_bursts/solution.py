@@ -1,4 +1,4 @@
-from wec import WEC
+from wec.wec import WEC
 
 
 class Solution(WEC):

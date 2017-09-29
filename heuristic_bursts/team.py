@@ -1,4 +1,4 @@
-from agent import Agent
+from heuristic_bursts.agent import Agent
 
 
 class Team(object):
