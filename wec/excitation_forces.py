@@ -1,5 +1,7 @@
 import keras as ks
 import numpy as np
+import importlib as impl
+import os as os
 
 
 class ExcitationForces:
@@ -8,6 +10,13 @@ class ExcitationForces:
 
     @staticmethod
     def load_model(structure_file_name, weights_file_name):
+
+        # Set backend to Theano
+        if ks.backend.backend() != "theano":
+            os.environ['KERAS_BACKEND'] = "theano"
+            impl.reload(ks.backend)
+            assert ks.backend.backend() == "theano"
+
         temp = open(structure_file_name, 'r')
         ExcitationForces.model = ks.models.model_from_yaml(temp.read())
         ExcitationForces.model.load_weights(weights_file_name)
