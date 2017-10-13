@@ -1,8 +1,9 @@
-from heuristic_bursts.batch import Batch
+import heuristic_bursts.batch
+
 
 def test_creation_of_batch():
 
-    a = Batch('WEC', 3, 3)
+    a = heuristic_bursts.batch.Batch('WEC', 3, 3)
 
     print(a.team_list)
 
