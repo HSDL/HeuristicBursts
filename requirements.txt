@@ -2,3 +2,4 @@ numpy
 theano
 keras
 pymunk
+h5py
