@@ -109,7 +109,10 @@ class WEC(AbstractBaseSolution):
         self.world.add(temp_pivot)
 
 
-    # LUCAS: Put lower tier operations about here
+    # LUCAS: Put lower tier operations above here
+
+    # LUCAS: Higher tier operations will go here eventually too. These should follow the function definitions as defined
+    #        in the abstract base solution class.
 
     ### Everything below here is for evaluation
 
