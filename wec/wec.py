@@ -39,6 +39,7 @@ class WEC(AbstractBaseSolution):
         # current iteration
         self.iter = 0
 
+    # LUCAS: Lower tier operations go here
     def add_body(self, shape, density, position, **kwargs):
         if shape is 'sphere':
             radius = kwargs['radius']
@@ -63,6 +64,7 @@ class WEC(AbstractBaseSolution):
                             "last_velocity": np.zeros(2),
                             "last_position": np.zeros(2)})
 
+    # LUCAS: Lower tier operations go here
     def add_constrained_linear_pto(self, idxa, idxb, resting_length, stiffness, damping):
         # Add damped spring
         a = self.bodies[idxa]["body"]
@@ -87,6 +89,7 @@ class WEC(AbstractBaseSolution):
 
         self.world.add(temp_groove)
 
+    # LUCAS: Lower tier operations go here
     def add_rotational_pto(self, idxa, idxb, rest_angle, stiffness, damping):
         # Add damped spring
         a = self.bodies[idxa]["body"]
@@ -105,6 +108,10 @@ class WEC(AbstractBaseSolution):
         temp_pivot.error_bias = self.error_bias
         self.world.add(temp_pivot)
 
+
+    # LUCAS: Put lower tier operations about here
+
+    ### Everything below here is for evaluation
 
     def add_buoyant_force(self):
         for body in self.bodies:
