@@ -20,10 +20,12 @@ class AbstractBaseSolution:
         return
     # ########### Basic operations for solutions
 
-    # ########### Deep copy
-    # ########### Deep copy
+
     # ########### Higher tier operations
+    # Lucas: This is where function prototypes go for higher tier operations.
+    # Since these are all defined as abstract methods, the actual function definitions don't go here.
     # ########### Higher tier operations
+
 
     # ########### Comparison operators
     @abstractmethod
