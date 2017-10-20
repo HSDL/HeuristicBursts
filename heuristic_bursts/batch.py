@@ -10,6 +10,7 @@ class Batch(object):
         # This line has to go here to allow
         from heuristic_bursts.team import Team
 
+        # Instantiating teams
         for i in range(number_of_teams):
             self.team_list.append(Team(number_of_agents))
 

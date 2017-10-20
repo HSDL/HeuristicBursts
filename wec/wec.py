@@ -32,12 +32,14 @@ class WEC(AbstractBaseSolution):
         self.power = 0
         self.pieces = 0
 
-        # Load neural network for simulations
+        # Start lists for PTO types
         self.linear_ptos = []
         self.rotary_ptos = []
 
         # current iteration
         self.iter = 0
+
+
 
     # LUCAS: Lower tier operations go here
     def add_body(self, shape, density, position, **kwargs):
