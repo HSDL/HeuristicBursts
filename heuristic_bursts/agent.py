@@ -11,6 +11,10 @@ class Agent(object):
         self.current_solution_quality = np.Inf
 
     def iterate(self):
+        # First, decide what kind of action to do
+        # Second, apply the rule:
+        # Third, evaluate: self.candidate_solution.evaluate()
+        # Fourth, tune approach based on evaluation.
         asdf = 1
 
     def evaluate(self):
