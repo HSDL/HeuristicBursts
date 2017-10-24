@@ -3,8 +3,8 @@ import pymunk as pm
 
 from heuristic_bursts.abstract_base_solution import AbstractBaseSolution
 
-import wec.spectrum as sp
-import wec.excitation_forces as ef
+import spectrum as sp
+import excitation_forces as ef
 
 
 class WEC(AbstractBaseSolution):
@@ -13,7 +13,7 @@ class WEC(AbstractBaseSolution):
     error_bias = 0.02
     spectrum = sp.Spectrum('bretschneider', fp=0.5, Hm0=2)
     forces = ef.ExcitationForces()
-    forces.load_model('./wec/data/full_network_structure.yml', './wec/data/full_network_weights.h5')
+    forces.load_model('./data/full_network_structure.yml', './data/full_network_weights.h5')
     rho_w = 1000
     gravity = -9.81
     number_of_metrics = 3
@@ -52,6 +52,13 @@ class WEC(AbstractBaseSolution):
             # Next build voxel map for points on body
             # Finally
             coefficients = []
+        elif shape is 'cylinder':
+            radius = kwargs['radius']
+            length = kwargs['length']
+            volume = np.pi*np.power(radius,2)*length
+            mass = density * volume
+            moment = 0.25*mass*np.power(radius,2) + (1/12.)*mass*np.power(length,2)  # Moment about central diameter
+            coefficients = []
         temp_body = pm.Body(mass=mass, moment=moment)
         temp_body.position = position
         self.world.add(temp_body)
@@ -62,9 +69,11 @@ class WEC(AbstractBaseSolution):
                             "mass": mass,
                             "moment": moment,
                             "radius": radius,
+                            "length": length,
                             "xyz": np.zeros((self.simulation_steps, 2)),
                             "last_velocity": np.zeros(2),
-                            "last_position": np.zeros(2)})
+                            "last_position": np.zeros(2),
+                            "shape": shape})
 
     # LUCAS: Lower tier operations go here
     def add_constrained_linear_pto(self, idxa, idxb, resting_length, stiffness, damping):
@@ -109,6 +118,34 @@ class WEC(AbstractBaseSolution):
         temp_pivot.collide_bodies = False
         temp_pivot.error_bias = self.error_bias
         self.world.add(temp_pivot)
+
+    # Have to review from this point to end of lower tier operations
+    def remove_body(self, index):
+        del self.bodies[index]
+
+    def remove_joint(self, index, joint_type):
+        if joint_type is 'rotational':
+            del self.rotary_ptos[index]
+        elif joint_type is 'linear':
+            del self.linear_ptos[index]
+
+    def add_rotational_body(self, shape, density, position, idxa, idxb, rest_angle, stiffness, damping, **kwargs):
+        self.add_body(shape, density, position, **kwargs)
+        self.add_rotational_pto(idxa, idxb, rest_angle, stiffness, damping)
+
+    def add_linear_body(self, shape, density, position, idxa, idxb, resting_length, stiffness, damping, **kwargs):
+        self.add_body(shape, density, position, **kwargs)
+        self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
+
+    def change_joint_type(self, joint_initial_type):
+        pass
+
+    def change_body_dimensions(self, index,**kwargs):
+        pass
+
+    def change_body_density(self):
+        pass
+
 
 
     # LUCAS: Put lower tier operations above here
