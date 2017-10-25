@@ -1,5 +1,5 @@
-import os as os
-
+import os
+import pkg_resources
 
 class Batch(object):
 
@@ -19,11 +19,11 @@ class Batch(object):
         solution_file = solution_class.lower()
 
         try:
-            os.remove('./heuristic_bursts/solution.py')
+            os.remove(pkg_resources.resource_filename('heuristic_bursts', 'solution.py'))
         except OSError:
             pass
 
-        with open('./heuristic_bursts/solution.py', 'w') as fid:
+        with open(pkg_resources.resource_filename('heuristic_bursts', 'solution.py'), 'w') as fid:
             fid.write('from %s.%s import %s\n\n\n' % (solution_file, solution_file, solution_class))
             fid.write('class Solution(%s):\n' % solution_class)
             fid.write('    def __init__(self):\n')
