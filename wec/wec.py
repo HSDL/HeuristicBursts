@@ -41,10 +41,13 @@ class WEC(AbstractBaseSolution):
         # current iteration
         self.iter = 0
 
-
-
-    # LUCAS: Lower tier operations go here
     def add_body(self, shape, density, position, **kwargs):
+
+        # LUCAS: I added these to make sure that they have *some* value. Otherwise, the 'length' variable
+        #  may be undefined when you try to use it on line 76
+        radius = 0
+        length = 0
+
         if shape is 'sphere':
             radius = kwargs['radius']
             volume = (4.0/3.0)*np.pi*np.power(radius, 3)
