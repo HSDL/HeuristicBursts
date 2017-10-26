@@ -1,11 +1,12 @@
 import numpy as np
-from heuristic_bursts.solution import Solution
+import heuristic_bursts
 
 
 class Agent(object):
 
-    def __init__(self):
-        self.current_solution = Solution()
+    def __init__(self, options):
+        self.options = options
+        self.current_solution = heuristic_bursts.solution.Solution()
         self.metrics = []
         self.weights = [1/3., 1/3., 1/3.]
         self.current_solution_quality = np.Inf
@@ -19,10 +20,4 @@ class Agent(object):
 
     def evaluate(self):
         self.metrics = self.current_solution.evaluate()
-        for i in range(Solution.number_of_metrics):
-            self.quality = self.metrics[i]*self.weights[i]
-
-
-
-
-##
+        self.current_solution_quality = [self.metrics[i]*self.weights[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)]

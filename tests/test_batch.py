@@ -1,10 +1,11 @@
-import heuristic_bursts.batch
+import heuristic_bursts
 
 
 def test_creation_of_batch():
 
-    a = heuristic_bursts.batch.Batch('WEC', 3, 3)
-
+    options = heuristic_bursts.options.Options(solution_class='WEC',
+                                               number_of_agents=3,
+                                               number_of_teams=3)
+    a = heuristic_bursts.batch.Batch(options)
     print(a.team_list)
-
     assert(len(a.team_list) == 3)

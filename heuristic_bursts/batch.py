@@ -1,18 +1,24 @@
 import os
 import pkg_resources
 
+
 class Batch(object):
 
-    def __init__(self, solution_class, number_of_agents, number_of_teams):
-        self._print_solution_class(solution_class)
+    def __init__(self, options):
+        self._print_solution_class(options.solution_class)
         self.team_list = []
+        self.options = options
 
         # This line has to go here to allow
         from heuristic_bursts.team import Team
 
         # Instantiating teams
-        for i in range(number_of_teams):
-            self.team_list.append(Team(number_of_agents))
+        for i in range(self.options.number_of_teams):
+            self.team_list.append(Team(self.options))
+
+    def run(self):
+        for team in self.team_list:
+            team.run()
 
     @staticmethod
     def _print_solution_class(solution_class):
