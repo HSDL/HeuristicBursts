@@ -1,6 +1,6 @@
-import numpy as np
+import numpy
 import heuristic_bursts
-
+import copy
 
 class Agent(object):
 
@@ -9,14 +9,25 @@ class Agent(object):
         self.current_solution = heuristic_bursts.solution.Solution()
         self.metrics = []
         self.weights = [1/3., 1/3., 1/3.]
-        self.current_solution_quality = np.Inf
+        self.current_solution_quality = numpy.Inf
+        if options.learning_style is 'multinomial':
+            self.highertier_weights = numpy.ones(heuristic_bursts.solution.Solution.number_of_highertier_operations)
+        elif options.learning_style is 'markovian':
+            self.highertier_weights = numpy.ones([heuristic_bursts.solution.Solution.number_of_highertier_operations,
+                                                  heuristic_bursts.solution.Solution.number_of_highertier_operations])
 
     def iterate(self):
-        # First, decide what kind of action to do
-        # Second, apply the rule:
-        # Third, evaluate: self.candidate_solution.evaluate()
-        # Fourth, tune approach based on evaluation.
-        asdf = 1
+        # Deep copy the candidate solution
+        candidate_solution = copy.deepcopy(self.current_solution)
+
+        # Decide which action to take
+
+        # Apply that action and evaluate the outcome
+        candidate_solution.evaluate()
+
+        # Decide whether to keep the current solution or revert.
+
+        # Tune approach based on evaluation and decision.
 
     def evaluate(self):
         self.metrics = self.current_solution.evaluate()

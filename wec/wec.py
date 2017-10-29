@@ -248,3 +248,6 @@ class WEC(AbstractBaseSolution):
         self.pieces = len(self.linear_ptos) + len(self.rotary_ptos) + len(self.bodies)
 
         return [self.mass, -self.power, self.pieces]
+
+    def __deepcopy__(self):
+        asdf = 1

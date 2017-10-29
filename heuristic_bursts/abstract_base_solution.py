@@ -5,6 +5,7 @@ class AbstractBaseSolution:
     __metaclass__ = ABCMeta
     id_counter = 0
     number_of_metrics = 0
+    number_of_highertier_operations = 3
 
     def stamp_solution(self):
         self.id = AbstractBaseSolution.id_counter
@@ -17,6 +18,10 @@ class AbstractBaseSolution:
 
     @abstractmethod
     def evaluate(self):
+        return
+
+    @abstractmethod
+    def __deepcopy__(self):
         return
     # ########### Basic operations for solutions
 
