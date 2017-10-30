@@ -37,6 +37,9 @@ class WEC(AbstractBaseSolution):
         # Start lists for PTO types
         self.linear_ptos = []
         self.rotary_ptos = []
+        self.linear_ptos_data = []
+        self.rotary_ptos_data = []
+
 
         # current iteration
         self.iter = 0
@@ -88,6 +91,12 @@ class WEC(AbstractBaseSolution):
         temp_pto.error_bias = self.error_bias
         self.world.add(temp_pto)
         self.linear_ptos.append(temp_pto)
+        self.linear_ptos_data.append({"Linear PTO": temp_pto,
+                                      "idxa": idxa,
+                                      "idxb": idxb,
+                                      "resting_length": resting_length,
+                                      "stiffness": stiffness,
+                                      "damping": damping})
 
         # Add groove to constrain linear motion
         temp_groove = pm.constraint.GrooveJoint(a, b, a.center_of_gravity,
@@ -112,6 +121,12 @@ class WEC(AbstractBaseSolution):
         temp_pto.error_bias = self.error_bias
         self.world.add(temp_pto)
         self.rotary_ptos.append(temp_pto)
+        self.rotary_ptos_data.append({"Rotational PTO": temp_pto,
+                                      "idxa": idxa,
+                                      "idxb": idxb,
+                                      "rest_angle": rest_angle,
+                                      "stiffness": stiffness,
+                                      "damping": damping})
 
         # Add a pivot joint
         acg = a.local_to_world(a.center_of_gravity)
@@ -121,15 +136,17 @@ class WEC(AbstractBaseSolution):
         temp_pivot.error_bias = self.error_bias
         self.world.add(temp_pivot)
 
-    # Have to review from this point to end of lower tier operations
+    # Note: still need to update in World!
     def remove_body(self, index):
         del self.bodies[index]
 
     def remove_joint(self, index, joint_type):
         if joint_type is 'rotational':
             del self.rotary_ptos[index]
+            del self.rotary_ptos_data[index]
         elif joint_type is 'linear':
             del self.linear_ptos[index]
+            del self.linear_ptos_data[index]
 
     def add_rotational_body(self, shape, density, position, idxa, idxb, rest_angle, stiffness, damping, **kwargs):
         self.add_body(shape, density, position, **kwargs)
@@ -139,15 +156,58 @@ class WEC(AbstractBaseSolution):
         self.add_body(shape, density, position, **kwargs)
         self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
 
-    def change_joint_type(self, joint_initial_type):
-        pass
+    def change_joint_type(self, joint_initial_type, index):
+        if joint_initial_type is 'rotational':
+            resting_length = 1
+            self.add_constrained_linear_pto(self.rotary_ptos_data[index]["idxa"],
+                                            self.rotary_ptos_data[index]["idxb"],
+                                            resting_length,
+                                            self.rotary_ptos_data[index]["stiffness"],
+                                            self.rotary_ptos_data[index]["damping"])
+        elif joint_initial_type is 'linear':
+            rest_angle = 0
+            self.add_rotational_pto(self.linear_ptos_data[index]["idxa"],
+                                    self.linear_ptos_data[index]["idxb"],
+                                    rest_angle,
+                                    self.linear_ptos_data[index]["stiffness"],
+                                    self.linear_ptos_data[index]["damping"])
 
-    def change_body_dimensions(self, index,**kwargs):
-        pass
+        self.remove_joint(index, joint_initial_type)
 
-    def change_body_density(self):
-        pass
+    def change_body_dimensions(self, index, **kwargs):
+        temp_body = self.bodies[index]
 
+        if temp_body["shape"] is 'sphere':
+            radius = kwargs['radius']
+            length = temp_body["length"]
+            volume = (4.0 / 3.0) * np.pi * np.power(radius, 3)
+            mass = temp_body["density"] * volume
+            moment = 0.4*mass*np.power(radius, 2)
+        elif temp_body["shape"] is 'cylinder':
+            radius = kwargs['radius']
+            length = kwargs['length']
+            volume = np.pi*np.power(radius,2)*length
+            mass = temp_body["density"] * volume
+            moment = 0.25 * mass * np.power(radius, 2) + (1 / 12.) * mass * np.power(length, 2)
+
+        self.bodies[index]["radius"] = radius
+        self.bodies[index]["length"] = length
+        self.bodies[index]["volume"] = volume
+        self.bodies[index]["mass"] = mass
+        self.bodies[index]["moment"] = moment
+
+    def change_body_density(self, index, density):
+        temp_body = self.bodies[index]
+        mass = density * temp_body["volume"]
+
+        if temp_body["shape"] is 'sphere':
+            moment = 0.4*mass*np.power(temp_body["radius"], 2)
+        elif temp_body["shape"] is 'cylinder':
+            moment = 0.25*mass*np.power(temp_body["radius"], 2) + (1/12.)*mass*np.power(temp_body["length"], 2)
+
+        self.bodies[index]["density"] = density
+        self.bodies[index]["mass"] = mass
+        self.bodies[index]["moment"] = moment
 
 
     # LUCAS: Put lower tier operations above here
