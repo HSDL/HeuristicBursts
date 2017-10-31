@@ -10,11 +10,11 @@ class Batch(object):
         self.options = options
 
         # This line has to go here to allow
-        from heuristic_bursts.team import Team
+        import heuristic_bursts.team
 
         # Instantiating teams
         for i in range(self.options.number_of_teams):
-            self.team_list.append(Team(self.options))
+            self.team_list.append(heuristic_bursts.team.Team(self.options))
 
     def run(self):
         for team in self.team_list:

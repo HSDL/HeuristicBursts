@@ -1,6 +1,7 @@
 import numpy
-import heuristic_bursts
 import copy
+import heuristic_bursts.solution
+
 
 class Agent(object):
 

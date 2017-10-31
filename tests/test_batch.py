@@ -1,4 +1,5 @@
-import heuristic_bursts
+import heuristic_bursts.options
+import heuristic_bursts.batch
 
 
 def test_creation_of_batch():

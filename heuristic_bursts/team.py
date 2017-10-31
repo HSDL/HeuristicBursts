@@ -1,4 +1,4 @@
-import heuristic_bursts
+import heuristic_bursts.agent
 
 
 class Team(object):
