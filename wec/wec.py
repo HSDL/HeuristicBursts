@@ -66,7 +66,9 @@ class WEC(AbstractBaseSolution):
             coefficients = []
         temp_body = pm.Body(mass=mass, moment=moment)
         temp_body.position = position
+        shape = pm.Circle(temp_body, kwargs['radius'])
         self.world.add(temp_body)
+        self.world.add(shape)
         self.bodies.append({"body": temp_body,
                             "coefficients": coefficients,
                             "density": density,
@@ -136,7 +138,15 @@ class WEC(AbstractBaseSolution):
         temp_pivot.error_bias = self.error_bias
         self.world.add(temp_pivot)
 
-    # Note: still need to update in World!
+    def add_rotational_body(self, shape, density, position, idxa, idxb, rest_angle, stiffness, damping, **kwargs):
+        self.add_body(shape, density, position, **kwargs)
+        self.add_rotational_pto(idxa, idxb, rest_angle, stiffness, damping)
+
+    def add_linear_body(self, shape, density, position, idxa, idxb, resting_length, stiffness, damping, **kwargs):
+        self.add_body(shape, density, position, **kwargs)
+        self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
+
+    # Note: all of these still need to update in World!
     def remove_body(self, index):
         del self.bodies[index]
 
@@ -148,13 +158,9 @@ class WEC(AbstractBaseSolution):
             del self.linear_ptos[index]
             del self.linear_ptos_data[index]
 
-    def add_rotational_body(self, shape, density, position, idxa, idxb, rest_angle, stiffness, damping, **kwargs):
-        self.add_body(shape, density, position, **kwargs)
-        self.add_rotational_pto(idxa, idxb, rest_angle, stiffness, damping)
-
-    def add_linear_body(self, shape, density, position, idxa, idxb, resting_length, stiffness, damping, **kwargs):
-        self.add_body(shape, density, position, **kwargs)
-        self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
+    def remove_body_with_joint(self, body_index, joint_index, joint_type):
+        self.remove_body(body_index)
+        self.remove_joint(joint_index, joint_type)
 
     def change_joint_type(self, joint_initial_type, index):
         if joint_initial_type is 'rotational':
@@ -209,6 +215,25 @@ class WEC(AbstractBaseSolution):
         self.bodies[index]["mass"] = mass
         self.bodies[index]["moment"] = moment
 
+    # Incomplete function; need to figure out best way to go about this
+    def relocate_body_with_joint(self, body_index, joint_index, joint_type):
+        temp_body = self.bodies[body_index]
+        self.remove_body_with_joint(body_index, joint_index, joint_type)
+
+    def swap_bodies(self):
+        pass
+
+    def add_mooring_system(self):
+        pass
+
+    def remove_mooring_system(self):
+        pass
+
+    def relocate_mooring_cable_attachment(self):
+        pass
+
+    def relocate_mooring_fixed_body(self):
+        pass
 
     # LUCAS: Put lower tier operations above here
 
