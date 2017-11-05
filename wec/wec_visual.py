@@ -14,8 +14,9 @@ class wec_visual():
     def display(self, device):
 
         options = pymunk.pygame_util.DrawOptions(self.screen)
-        device.world.step(1)
-        device.world.step(2)
+        self.screen.fill((255, 255, 255))
+        device.world.step(.01)
+        device.world.step(.02)
         device.world.debug_draw(options)
         pygame.display.update()
 

@@ -37,6 +37,8 @@ class WEC(AbstractBaseSolution):
         # Start lists for PTO types
         self.linear_ptos = []
         self.rotary_ptos = []
+        self.pivot_joints = []
+        self.groove_joints = []
         self.linear_ptos_data = []
         self.rotary_ptos_data = []
 
@@ -60,9 +62,9 @@ class WEC(AbstractBaseSolution):
         elif shape is 'cylinder':
             radius = kwargs['radius']
             length = kwargs['length']
-            volume = np.pi*np.power(radius,2)*length
+            volume = np.pi*np.power(radius, 2)*length
             mass = density * volume
-            moment = 0.25*mass*np.power(radius,2) + (1/12.)*mass*np.power(length,2)  # Moment about central diameter
+            moment = 0.25*mass*np.power(radius, 2) + (1/12.)*mass*np.power(length, 2)  # Moment about central diameter
             coefficients = []
         temp_body = pm.Body(mass=mass, moment=moment)
         temp_body.position = position
@@ -112,6 +114,7 @@ class WEC(AbstractBaseSolution):
         temp_groove.error_bias = self.error_bias
 
         self.world.add(temp_groove)
+        self.groove_joints.append(temp_groove)
 
     # LUCAS: Lower tier operations go here
     def add_rotational_pto(self, idxa, idxb, rest_angle, stiffness, damping):
@@ -137,6 +140,7 @@ class WEC(AbstractBaseSolution):
         temp_pivot.collide_bodies = False
         temp_pivot.error_bias = self.error_bias
         self.world.add(temp_pivot)
+        self.pivot_joints.append(temp_pivot)
 
     def add_rotational_body(self, shape, density, position, idxa, idxb, rest_angle, stiffness, damping, **kwargs):
         self.add_body(shape, density, position, **kwargs)
@@ -146,15 +150,21 @@ class WEC(AbstractBaseSolution):
         self.add_body(shape, density, position, **kwargs)
         self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
 
-    # Note: all of these still need to update in World!
     def remove_body(self, index):
+        body = self.bodies[index]['body']
         del self.bodies[index]
+        self.world.remove(body)
+        self.world.remove(self.world.shapes[index])
 
     def remove_joint(self, index, joint_type):
         if joint_type is 'rotational':
+            # temp_pto = self.rotary_ptos[index]['Rotational PTO']
             del self.rotary_ptos[index]
             del self.rotary_ptos_data[index]
         elif joint_type is 'linear':
+            temp_pto = self.linear_ptos[index]
+            self.world.constraints.remove(temp_pto)
+            print(temp_pto)
             del self.linear_ptos[index]
             del self.linear_ptos_data[index]
 
