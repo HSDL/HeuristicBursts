@@ -12,28 +12,28 @@ def test_simulation_of_wec():
 
     display.display(device)
 
-    device.add_body('sphere', 10, (475, 400.0), radius=50)
+    device.add_rotational_body('sphere', 20, (450, 400.0), 0, 1, 0, 1000, 1000, radius=25)
 
     display.display(device)
 
-    device.add_constrained_linear_pto(0, 1, 75, 1000, 10000)
+    device.add_linear_body('sphere', 15, (300, 400.0), 0, 2, 100, 1000, 1000, radius=75)
 
     display.display(device)
 
-    device.add_body('sphere', 10, (300, 400.0), radius=75)
-    # device.add_linear_body('sphere', 20, (500, 400.0), 0, 1, 50, 10000, 10000, radius=25)
-    # device.add_rotational_body('sphere', 10, (300, 400.0), 2, 0, 0, 20000, 40000, radius=25)
-    # device.add_linear_body('sphere', 20, (400, 300.0), 3, 0, 50, 15000, 20000, radius=25)
-    display.display(device)
-
-    device.add_rotational_pto(0, 2, 0, 1000, 10000)
+    device.change_joint_type(0, 'rotational')
 
     display.display(device)
 
-    # device.remove_body(1)
-    device.remove_joint(0, 'linear')
+    device.remove_body_with_joint(2, 0, 'linear')
 
     display.display(device)
 
-    print(device.world.constraints)
+    device.remove_body_with_joint(1, 0, 'linear')
+
+    display.display(device)
+
+    device.remove_body(0)
+
+    display.display(device)
+
     time.sleep(5)

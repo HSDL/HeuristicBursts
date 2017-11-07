@@ -34,7 +34,7 @@ class WEC(AbstractBaseSolution):
         self.power = 0
         self.pieces = 0
 
-        # Start lists for PTO types
+        # Start lists for PTO types and constraints
         self.linear_ptos = []
         self.rotary_ptos = []
         self.pivot_joints = []
@@ -42,14 +42,11 @@ class WEC(AbstractBaseSolution):
         self.linear_ptos_data = []
         self.rotary_ptos_data = []
 
-
         # current iteration
         self.iter = 0
 
     def add_body(self, shape, density, position, **kwargs):
-
-        # LUCAS: I added these to make sure that they have *some* value. Otherwise, the 'length' variable
-        #  may be undefined when you try to use it on line 76
+        # Calculate properties of body
         radius = 0
         length = 0
 
@@ -66,9 +63,13 @@ class WEC(AbstractBaseSolution):
             mass = density * volume
             moment = 0.25*mass*np.power(radius, 2) + (1/12.)*mass*np.power(length, 2)  # Moment about central diameter
             coefficients = []
+
+        # Create body for simulation
         temp_body = pm.Body(mass=mass, moment=moment)
         temp_body.position = position
+        # Create shape for visual
         shape = pm.Circle(temp_body, kwargs['radius'])
+        # Add body and shape to simulation and stored lists
         self.world.add(temp_body)
         self.world.add(shape)
         self.bodies.append({"body": temp_body,
@@ -84,15 +85,15 @@ class WEC(AbstractBaseSolution):
                             "last_position": np.zeros(2),
                             "shape": shape})
 
-    # LUCAS: Lower tier operations go here
     def add_constrained_linear_pto(self, idxa, idxb, resting_length, stiffness, damping):
-        # Add damped spring
+        # Create damped spring for simulation
         a = self.bodies[idxa]["body"]
         b = self.bodies[idxb]["body"]
         temp_pto = pm.constraint.DampedSpring(a, b, a.center_of_gravity, b.center_of_gravity,
                                               resting_length, stiffness, damping)
         temp_pto.collide_bodies = False
         temp_pto.error_bias = self.error_bias
+        # Add damped spring to simulation and stored lists
         self.world.add(temp_pto)
         self.linear_ptos.append(temp_pto)
         self.linear_ptos_data.append({"Linear PTO": temp_pto,
@@ -102,28 +103,32 @@ class WEC(AbstractBaseSolution):
                                       "stiffness": stiffness,
                                       "damping": damping})
 
-        # Add groove to constrain linear motion
+        # Create first groove to constrain linear motion
         temp_groove = pm.constraint.GrooveJoint(a, b, a.center_of_gravity,
                                                 a.center_of_gravity + 2*(b.position - a.position), b.center_of_gravity)
         temp_groove.collide_bodies = False
         temp_groove.error_bias = self.error_bias
+        # Add first groove to simulation and stored list
         self.world.add(temp_groove)
+        self.groove_joints.append(temp_groove)
+        # Create second groove to constrain linear motion
         temp_groove = pm.constraint.GrooveJoint(b, a, b.center_of_gravity,
                                                 b.center_of_gravity + 2*(a.position - b.position), a.center_of_gravity)
         temp_groove.collide_bodies = False
         temp_groove.error_bias = self.error_bias
-
+        # Add second groove to simulation and stored list
         self.world.add(temp_groove)
         self.groove_joints.append(temp_groove)
 
     # LUCAS: Lower tier operations go here
     def add_rotational_pto(self, idxa, idxb, rest_angle, stiffness, damping):
-        # Add damped spring
+        # Create damped rotary spring for simulation
         a = self.bodies[idxa]["body"]
         b = self.bodies[idxb]["body"]
         temp_pto = pm.constraint.DampedRotarySpring(a, b, rest_angle, stiffness, damping)
         temp_pto.collide_bodies = False
         temp_pto.error_bias = self.error_bias
+        # Add damped rotary spring to simulation and stored lists
         self.world.add(temp_pto)
         self.rotary_ptos.append(temp_pto)
         self.rotary_ptos_data.append({"Rotational PTO": temp_pto,
@@ -133,12 +138,13 @@ class WEC(AbstractBaseSolution):
                                       "stiffness": stiffness,
                                       "damping": damping})
 
-        # Add a pivot joint
+        # Create a pivot joint
         acg = a.local_to_world(a.center_of_gravity)
         bcg = b.local_to_world(b.center_of_gravity)
         temp_pivot = pm.constraint.PivotJoint(a, b, 0.5*(acg + bcg))
         temp_pivot.collide_bodies = False
         temp_pivot.error_bias = self.error_bias
+        # Add pivot to simulation and stored list
         self.world.add(temp_pivot)
         self.pivot_joints.append(temp_pivot)
 
@@ -151,30 +157,58 @@ class WEC(AbstractBaseSolution):
         self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
 
     def remove_body(self, index):
+        # Create temporary storage of body of shape
         body = self.bodies[index]['body']
-        del self.bodies[index]
+        shape = self.bodies[index]['shape']
+        # Remove body and shape from simulation
         self.world.remove(body)
-        self.world.remove(self.world.shapes[index])
+        self.world.remove(shape)
+        # Clear information from body list
+        del self.bodies[index]
 
     def remove_joint(self, index, joint_type):
+        # Removing rotary pto and pivot joint
         if joint_type is 'rotational':
-            # temp_pto = self.rotary_ptos[index]['Rotational PTO']
+            # Create reference objects for spring and pivot
+            temp_pto = self.rotary_ptos[index]
+            temp_pivot = self.pivot_joints[index]
+
+            # Delete from world
+            self.world.remove(temp_pto)
+            self.world.remove(temp_pivot)
+
+            # Delete from storage lists
             del self.rotary_ptos[index]
             del self.rotary_ptos_data[index]
+            del self.pivot_joints[index]
+        # Removing linear pto and groove joint
         elif joint_type is 'linear':
+            # Create reference objects for spring and grooves
             temp_pto = self.linear_ptos[index]
-            self.world.constraints.remove(temp_pto)
-            print(temp_pto)
+            temp_groove_a = self.groove_joints[index*2]
+            temp_groove_b = self.groove_joints[index*2 + 1]
+
+            # Delete from world
+            self.world.remove(temp_pto)
+            self.world.remove(temp_groove_a)
+            self.world.remove(temp_groove_b)
+
+            # Delete from storage lists
             del self.linear_ptos[index]
             del self.linear_ptos_data[index]
+            del self.groove_joints[index*2]
+            del self.groove_joints[index*2]
 
     def remove_body_with_joint(self, body_index, joint_index, joint_type):
-        self.remove_body(body_index)
         self.remove_joint(joint_index, joint_type)
+        self.remove_body(body_index)
 
-    def change_joint_type(self, joint_initial_type, index):
+    def change_joint_type(self, index, joint_initial_type):
+        # Change from initial joint type to opposite
         if joint_initial_type is 'rotational':
-            resting_length = 1
+            # Use distance between bodies as resting length
+            # resting_length = abs(np.linalg.norm(self.world.bodies[self.rotary_ptos_data[index]['idxa']]['position']) - norm(self.world.bodies[self.rotary_ptos_data[index]['idxb']]['position']))
+            resting_length = 50
             self.add_constrained_linear_pto(self.rotary_ptos_data[index]["idxa"],
                                             self.rotary_ptos_data[index]["idxb"],
                                             resting_length,
@@ -188,6 +222,7 @@ class WEC(AbstractBaseSolution):
                                     self.linear_ptos_data[index]["stiffness"],
                                     self.linear_ptos_data[index]["damping"])
 
+        # Remove original joint
         self.remove_joint(index, joint_initial_type)
 
     def change_body_dimensions(self, index, **kwargs):
