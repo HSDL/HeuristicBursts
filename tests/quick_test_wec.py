@@ -12,7 +12,7 @@ def test_simulation_of_wec():
 
     display.display(device)
 
-    device.add_rotational_body('sphere', 20, (450, 400.0), 0, 1, 0, 1000, 1000, radius=25)
+    device.add_linear_body('sphere', 20, (500, 400.0), 0, 1, 0, 1000, 1000, radius=75)
 
     display.display(device)
 
@@ -20,19 +20,11 @@ def test_simulation_of_wec():
 
     display.display(device)
 
-    device.change_joint_type(0, 'rotational')
+    device.add_mooring_system((400, 200.0), 1, 200, 1000, 1000)
 
     display.display(device)
 
-    device.remove_body_with_joint(2, 0, 'linear')
-
-    display.display(device)
-
-    device.remove_body_with_joint(1, 0, 'linear')
-
-    display.display(device)
-
-    device.remove_body(0)
+    device.remove_mooring_system(0)
 
     display.display(device)
 

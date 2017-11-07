@@ -34,13 +34,17 @@ class WEC(AbstractBaseSolution):
         self.power = 0
         self.pieces = 0
 
-        # Start lists for PTO types and constraints
+        # Initialize lists for PTO types and constraints
         self.linear_ptos = []
         self.rotary_ptos = []
         self.pivot_joints = []
         self.groove_joints = []
         self.linear_ptos_data = []
         self.rotary_ptos_data = []
+
+        # Initialize lists for mooring system
+        self.fixed_bodies = []
+        self.cable_bodies = []
 
         # current iteration
         self.iter = 0
@@ -268,17 +272,49 @@ class WEC(AbstractBaseSolution):
     def swap_bodies(self):
         pass
 
-    def add_mooring_system(self):
-        pass
+    def add_mooring_system(self, position, body_index, resting_length, stiffness, damping):
+        radius = 20
 
-    def remove_mooring_system(self):
-        pass
+        # Create fixed body for simulation
+        temp_body = pm.Body(body_type = pm.Body.STATIC)
+        temp_body.position = position
+        # Create shape for visual
+        shape = pm.Circle(temp_body, radius)
+        # Create cable body as spring constraint for simulation
+        attach_body = self.bodies[body_index]["body"]
+        temp_cable = pm.constraint.DampedSpring(attach_body, temp_body, attach_body.center_of_gravity,
+                                                temp_body.center_of_gravity, resting_length, stiffness, damping)
+        # Add fixed and cable bodies to simulation and stored lists
+        self.world.add(temp_body)
+        self.world.add(shape)
+        self.world.add(temp_cable)
+        self.fixed_bodies.append({"body": temp_body,
+                                 "shape": shape,
+                                 "position": position})
+        self.cable_bodies.append(temp_cable)
+
+    def remove_mooring_system(self, index):
+        # Create temporary storage of fixed body, shape, and cable
+        body = self.fixed_bodies[index]['body']
+        shape = self.fixed_bodies[index]['shape']
+        cable_spring = self.cable_bodies[index]
+
+        # Remove body and shape from simulation
+        self.world.remove(body)
+        self.world.remove(shape)
+        self.world.remove(cable_spring)
+
+        # Clear information from lists
+        del self.fixed_bodies[index]
+        del self.cable_bodies[index]
 
     def relocate_mooring_cable_attachment(self):
         pass
 
-    def relocate_mooring_fixed_body(self):
+    def relocate_mooring_fixed_body(self, index, position):
         pass
+
+        # self.world.bodies[body].position = position
 
     # LUCAS: Put lower tier operations above here
 
