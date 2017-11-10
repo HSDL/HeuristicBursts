@@ -3,3 +3,4 @@ theano
 keras
 pymunk
 h5py
+pygame

@@ -37,4 +37,8 @@ class Options(object):
         if self.interaction_style not in interaction_options:
             raise ValueError('interaction_style must be one of '+", ".join(interaction_options))
 
-
+    def is_scheduled(self):
+        if self.interaction_style == 'scheduled':
+            return True
+        else:
+            return False

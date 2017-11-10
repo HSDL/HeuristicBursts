@@ -8,6 +8,7 @@ class Agent(object):
     def __init__(self, options):
         self.options = options
         self.current_solution = heuristic_bursts.solution.Solution()
+        self.team_current_solutions = []
         self.metrics = []
         self.weights = [1/3., 1/3., 1/3.]
         self.current_solution_quality = numpy.Inf
@@ -33,3 +34,7 @@ class Agent(object):
     def evaluate(self):
         self.metrics = self.current_solution.evaluate()
         self.current_solution_quality = [self.metrics[i]*self.weights[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)]
+
+    def interact(self):
+        asdf = 1
+        # Look at other solutions and see what you like
