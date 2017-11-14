@@ -16,3 +16,5 @@ def test_simulation_of_wec():
         print(body['mass'])
 
     device.evaluate()
+
+    print(device.power)
