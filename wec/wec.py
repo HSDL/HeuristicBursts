@@ -81,15 +81,11 @@ class WEC(AbstractBaseSolution):
         temp_body.position = position
         temp_body.angle = (angle_offset*np.pi)/180
 
-        # Create body for visual
-        # draw_body = temp_body
-        # draw_body.position = (position[0]*10 + 400, position[1]*10 + 400)
-
         # Create shape for visual
         if body_shape is 'sphere':
             shape = pm.Circle(temp_body, kwargs['radius'])
         elif body_shape is 'cylinder':
-            shape = pm.Poly(temp_body, [(length*5, radius*5), (length*5, -radius*5), (-length*5, radius*5), (-length*5, -radius*5)], radius=3)
+            shape = pm.Poly(temp_body, [(length/2, radius/2), (length/2, -radius/2), (-length/2, radius/2), (-length/2, -radius/2)], radius=3)
 
         # Add body and shape to simulation and stored lists
         self.world.add(temp_body)

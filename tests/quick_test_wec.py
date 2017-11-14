@@ -9,7 +9,7 @@ def test_simulation_of_wec():
     # display = wec.wec_visual.wec_visual()
     # display.display(device)
 
-    device.add_body('cylinder', 650.0, (400, 0), radius=5, length=10, angle_offset=90)
+    device.add_body('sphere', 650.0, (400, 0), radius=50)
     # device.add_rotational_body('sphere', 825.0, (400, -100), 0, 1, 0, 1000, 10000000, radius=50)
     # # device.add_rotational_body('sphere', 650.0, (600, 0), 1, 2, 0, 1000, 10000000, radius=50)
     #
@@ -28,4 +28,4 @@ def test_simulation_of_wec():
     device.evaluate()
     print(device.power)
 
-    time.sleep(5)
+    # time.sleep(5)
