@@ -480,18 +480,18 @@ class WEC(AbstractBaseSolution):
                 displaced_mass = self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)
 
             faddl = -displaced_mass * self.world.gravity
-            body["body"].apply_force_at_local_point(faddl, body["body"].center_of_gravity)
+            body["body"].apply_force_at_world_point(faddl, body["body"].local_to_world(body["body"].center_of_gravity))
 
     def add_excitation_force(self):
         for body in self.bodies:
             if body['body'].position[1] > -10:
-                body["body"].apply_force_at_local_point(
+                body["body"].apply_force_at_world_point(
                     (0, body['mass'] * np.sin(self.iter / 100 + body['body'].position[0])),
-                    body["body"].center_of_gravity)
+                    body["body"].local_to_world(body["body"].center_of_gravity))
 
     def add_radiative_force(self):
         for body in self.bodies:
-            body["body"].apply_force_at_local_point((0, 0), body["body"].center_of_gravity)
+            body["body"].apply_force_at_world_point((0, 0), body["body"].local_to_world(body["body"].center_of_gravity))
 
     def add_viscous_force(self):
         for body in self.bodies:
@@ -501,7 +501,7 @@ class WEC(AbstractBaseSolution):
             A = np.pi * np.power(body["radius"], 2)
             f = -0.5 * self.rho_w * Cd * A * v * np.linalg.norm(v)
 
-            body["body"].apply_force_at_local_point(f, body["body"].center_of_gravity)
+            body["body"].apply_force_at_world_point(f, body["body"].local_to_world(body["body"].center_of_gravity))
 
     def pull_position_data(self):
         for i in range(len(self.bodies)):
