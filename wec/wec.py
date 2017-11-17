@@ -7,7 +7,6 @@ import wec.spectrum as sp
 import wec.excitation_forces as ef
 import pkg_resources
 
-# REMOVE
 import wec.wec_visual
 import time
 
@@ -22,12 +21,14 @@ class WEC(AbstractBaseSolution):
     rho_w = 1000
     gravity = -9.81
     number_of_metrics = 3
+    sea_level = 400
 
     def __init__(self):
         #
         self.world = pm.Space()
         self.world.gravity = (0, -9.81)
         self.world.damping = 0.95
+
 
         # Save position history
         self.bodies = []
@@ -52,7 +53,7 @@ class WEC(AbstractBaseSolution):
 
         # current iteration
         self.iter = 0
-        self.display = wec.wec_visual.wec_visual()
+        self.display_visual = False
 
     def add_body(self, body_shape, density, position, **kwargs):
         # Calculate properties of body
@@ -170,12 +171,17 @@ class WEC(AbstractBaseSolution):
         self.world.add(temp_pivot)
         self.pivot_joints.append(temp_pivot)
 
-    def add_rotational_body(self, shape, density, position, idxa, idxb, rest_angle, stiffness, damping, **kwargs):
+    def add_rotational_body(self, shape, density, position, idxa, rest_angle, stiffness, damping, **kwargs):
         self.add_body(shape, density, position, **kwargs)
+        idxb = len(self.bodies) - 1
         self.add_rotational_pto(idxa, idxb, rest_angle, stiffness, damping)
 
-    def add_linear_body(self, shape, density, position, idxa, idxb, resting_length, stiffness, damping, **kwargs):
+    def add_linear_body(self, shape, density, position, idxa, stiffness, damping, **kwargs):
         self.add_body(shape, density, position, **kwargs)
+        idxb = len(self.bodies) - 1
+        pos_a = self.bodies[idxa]["body"].position
+        pos_b = self.bodies[idxb]["body"].position
+        resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2)
         self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
 
     def remove_body(self, index):
@@ -248,26 +254,39 @@ class WEC(AbstractBaseSolution):
                 self.add_constrained_linear_pto(pto["idxa"], pto["idxb"], resting_length, pto["stiffness"], pto["damping"])
                 temp_joint = self.linear_ptos[-1]
                 temp_joint_data = self.linear_ptos_data[-1]
-                temp_groove = self.groove_joints[-1]
+                temp_groove_a = self.groove_joints[-2]
+                temp_groove_b = self.groove_joints[-1]
                 self.linear_ptos.insert(joint_index, temp_joint)
                 self.linear_ptos_data.insert(joint_index, temp_joint_data)
-                self.groove_joints.insert(joint_index, temp_groove)
+                self.groove_joints.insert(joint_index*2, temp_groove_a)
+                self.groove_joints.insert(joint_index*2 + 1, temp_groove_b)
                 del self.linear_ptos[-1]
                 del self.linear_ptos_data[-1]
                 del self.groove_joints[-1]
+                del self.groove_joints[-1]
             joint_index += 1
+
+    def joint_index_shift(self, body_index):
+        for pto in self.rotary_ptos_data:
+            if pto["idxa"] > body_index:
+                pto["idxa"] -= 1
+            if pto["idxb"] > body_index:
+                pto["idxb"] -= 1
+        for pto in self.linear_ptos_data:
+            if pto["idxa"] > body_index:
+                pto["idxa"] -= 1
+            if pto["idxb"] > body_index:
+                pto["idxb"] -= 1
 
     def mooring_reinstancing(self, body_index):
         mooring_index = 0
         for cable in self.cable_bodies:
-            if cable.a is body_index or cable.b is body_index:
+            attachment_body = self.mooring_attachment_points[mooring_index]
+            if attachment_body is body_index:
+                print('yes')
                 temp_fixed_body = self.fixed_bodies[mooring_index]
-                pos_fixed = temp_fixed_body["body"].position
-                pos_body = self.bodies[body_index]["body"].position
-                resting_length = np.sqrt((pos_fixed[0] - pos_body[0]) ** 2 + (pos_fixed[1] - pos_body[1]) ** 2)
-
                 self.remove_mooring_system(mooring_index)
-                self.add_mooring_system(pos_fixed, body_index, resting_length, cable.stiffness, cable.damping)
+                self.add_mooring_system(temp_fixed_body["body"].position, body_index, cable.stiffness, cable.damping)
 
                 temp_fixed_body = self.fixed_bodies[-1]
                 self.fixed_bodies.insert(mooring_index, temp_fixed_body)
@@ -284,6 +303,7 @@ class WEC(AbstractBaseSolution):
     def remove_body_with_joint(self, body_index, joint_index, joint_type):
         self.remove_joint(joint_index, joint_type)
         self.remove_body(body_index)
+        self.joint_index_shift(body_index)
 
     def change_joint_type(self, index, joint_initial_type):
         # Change from initial joint type to opposite
@@ -337,7 +357,8 @@ class WEC(AbstractBaseSolution):
         density = temp_body["density"]
         radius = temp_body["radius"]
         length = temp_body["length"]
-        self.add_body(shape, density, new_position, radius=radius, length=length)
+        angle_offset = temp_body["angle_offset"]
+        self.add_body(shape, density, new_position, radius=radius, length=length, angle_offset=angle_offset)
         self.bodies.insert(body_index, self.bodies[-1])
 
         if joint_type is 'rotational':
@@ -362,14 +383,14 @@ class WEC(AbstractBaseSolution):
 
         self.remove_body(idxa)
         self.add_body(temp_body_b['body_shape'], temp_body_b['density'], temp_body_a['body'].position,
-                      radius=temp_body_b['radius'], length=temp_body_b['length'])
+                      radius=temp_body_b['radius'], length=temp_body_b['length'], angle_offset=temp_body_b['angle_offset'])
         temp_body = self.bodies[-1]
         self.bodies.insert(idxa, temp_body)
         del self.bodies[-1]
 
         self.remove_body(idxb)
         self.add_body(temp_body_a['body_shape'], temp_body_a['density'], temp_body_b['body'].position,
-                      radius=temp_body_a['radius'], length=temp_body_a['length'])
+                      radius=temp_body_a['radius'], length=temp_body_a['length'], angle_offset=temp_body_a['angle_offset'])
         temp_body = self.bodies[-1]
         self.bodies.insert(idxb, temp_body)
         del self.bodies[-1]
@@ -379,8 +400,12 @@ class WEC(AbstractBaseSolution):
         self.mooring_reinstancing(idxa)
         self.mooring_reinstancing(idxb)
 
-    def add_mooring_system(self, position, body_index, resting_length, stiffness, damping):
+    def add_mooring_system(self, position, body_index, stiffness, damping):
         radius = 20
+
+        pos_a = position
+        pos_b = self.bodies[body_index]["body"].position
+        resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2)
 
         # Create fixed body for simulation
         temp_body = pm.Body(body_type=pm.Body.STATIC)
@@ -421,12 +446,8 @@ class WEC(AbstractBaseSolution):
         temp_fixed_body = self.fixed_bodies[mooring_index]
         temp_cable = self.cable_bodies[mooring_index]
 
-        pos_fixed = temp_fixed_body["body"].position
-        pos_body = self.bodies[body_index]["body"].position
-        resting_length = np.sqrt((pos_fixed[0] - pos_body[0]) ** 2 + (pos_fixed[1] - pos_body[1]) ** 2)
-
         self.remove_mooring_system(mooring_index)
-        self.add_mooring_system(pos_fixed, body_index, resting_length, temp_cable.stiffness, temp_cable.damping)
+        self.add_mooring_system(temp_fixed_body["body"].position, body_index, temp_cable.stiffness, temp_cable.damping)
 
         temp_fixed_body = self.fixed_bodies[-1]
         self.fixed_bodies.insert(mooring_index, temp_fixed_body)
@@ -443,12 +464,8 @@ class WEC(AbstractBaseSolution):
         temp_body_index = self.mooring_attachment_points[mooring_index]
         temp_body = self.bodies[temp_body_index]
 
-        pos_fixed = position
-        pos_body = temp_body["body"].position
-        resting_length = np.sqrt((pos_fixed[0] - pos_body[0]) ** 2 + (pos_fixed[1] - pos_body[1]) ** 2)
-
         self.remove_mooring_system(mooring_index)
-        self.add_mooring_system(pos_fixed, temp_body_index, resting_length, temp_cable.stiffness, temp_cable.damping)
+        self.add_mooring_system(position, temp_body_index, temp_cable.stiffness, temp_cable.damping)
 
         temp_fixed_body = self.fixed_bodies[-1]
         self.fixed_bodies.insert(mooring_index, temp_fixed_body)
@@ -469,13 +486,47 @@ class WEC(AbstractBaseSolution):
 
     def add_buoyant_force(self):
         for body in self.bodies:
+            # if body["body_shape"] is "sphere":
+            #     r = body["radius"]
+            #     if r + body["body"].position[1] < self.sea_level:
+            #         displaced_mass = body["volume"] * self.rho_w
+            #     elif body["body"].position[1] - r > self.sea_level:
+            #         displaced_mass = 0
+            #     else:
+            #         h = r - body["body"].position[1] + self.sea_level
+            #         c = np.sqrt(h * (2 * r - h))
+            #         displaced_mass = self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)
+            # elif body["body_shape"] is "cylinder":
+            #     r = body["radius"]
+            #     l = body["length"]
+            #     index = self.world.bodies.index(body["body"])
+            #     angle = self.world.bodies[index].angle
+            #     theta = (angle*np.pi)/180
+            #     phi = np.arctan(r/l)
+            #     d = np.sqrt((l/2)**2 + (r/2)**2) * np.sin(theta + phi)
+            #     if d + body["body"].position[1] < self.sea_level:
+            #         displaced_mass = body["volume"] * self.rho_w
+            #     elif body["body"].position[1] - d > self.sea_level:
+            #         displaced_mass = 0
+            #     else:
+            #         h = d - body["body"].position[1] + self.sea_level
+            #         beta = np.pi/2 - theta
+            #         x1 = h/np.sin(beta)
+            #         x2 = h/np.sin(theta)
+            #         A = 0.5 * x1 * x2
+            #         volume = A * r
+            #         print(theta)
+            #         print(beta)
+            #         print(" ")
+            #         # displaced_mass = volume * self.rho_w
+            #         displaced_mass = 0
             r = body["radius"]
-            if r + body["body"].position[1] < 0:
+            if r + body["body"].position[1] < self.sea_level:
                 displaced_mass = body["volume"] * self.rho_w
-            elif body["body"].position[1] - r > 0:
+            elif body["body"].position[1] - r > self.sea_level:
                 displaced_mass = 0
             else:
-                h = r - body["body"].position[1]
+                h = r - body["body"].position[1] + self.sea_level
                 c = np.sqrt(h * (2 * r - h))
                 displaced_mass = self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)
 
@@ -484,7 +535,7 @@ class WEC(AbstractBaseSolution):
 
     def add_excitation_force(self):
         for body in self.bodies:
-            if body['body'].position[1] > -10:
+            if body['body'].position[1] > self.sea_level - 10:
                 body["body"].apply_force_at_world_point(
                     (0, body['mass'] * np.sin(self.iter / 100 + body['body'].position[0])),
                     body["body"].local_to_world(body["body"].center_of_gravity))
@@ -510,10 +561,13 @@ class WEC(AbstractBaseSolution):
 
     def evaluate(self):
         energy = np.zeros(2)
+        if self.display_visual:
+            self.display = wec.wec_visual.wec_visual()
 
         while self.iter < self.simulation_steps:
 
-            self.display.display(self)
+            if self.display_visual:
+                self.display.display(self)
 
             # Add forces
             self.add_buoyant_force()
@@ -550,7 +604,8 @@ class WEC(AbstractBaseSolution):
 
             self.iter += 1
 
-            time.sleep(.01)
+            if self.display_visual:
+                time.sleep(.01)
 
         self.iter = 0
 

@@ -22,7 +22,7 @@ class wec_visual():
 
         options = pymunk.pygame_util.DrawOptions(self.screen)
         self.screen.fill((255, 255, 255))
-        # pygame.draw.rect(self.screen, self.light_blue, (0, self.SCREEN_HEIGHT/2, self.SCREEN_WIDTH, self.SCREEN_HEIGHT/2))
+        pygame.draw.rect(self.screen, self.light_blue, (0, self.SCREEN_HEIGHT/2, self.SCREEN_WIDTH, self.SCREEN_HEIGHT/2))
         # display_device = self.display_shift(device)
         device.world.debug_draw(options)
         pygame.display.update()
