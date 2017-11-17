@@ -104,7 +104,8 @@ class WEC(AbstractBaseSolution):
                             "last_velocity": np.zeros(2),
                             "last_position": np.zeros(2),
                             "shape": shape,
-                            "body_shape": body_shape})
+                            "body_shape": body_shape,
+                            "voxels": []})
 
     def add_constrained_linear_pto(self, idxa, idxb, resting_length, stiffness, damping):
         # Create damped spring for simulation
@@ -477,15 +478,13 @@ class WEC(AbstractBaseSolution):
         self.mooring_attachment_points.insert(mooring_index, temp_attachment_index)
         del self.mooring_attachment_points[-1]
 
-    # LUCAS: Put lower tier operations above here
-
     # LUCAS: Higher tier operations will go here eventually too. These should follow the function definitions as defined
     #        in the abstract base solution class.
 
-    ### Everything below here is for evaluation
 
     def add_buoyant_force(self):
         for body in self.bodies:
+            # TODO Add general computation that is voxel-based
             # if body["body_shape"] is "sphere":
             #     r = body["radius"]
             #     if r + body["body"].position[1] < self.sea_level:
@@ -532,6 +531,14 @@ class WEC(AbstractBaseSolution):
 
             faddl = -displaced_mass * self.world.gravity
             body["body"].apply_force_at_world_point(faddl, body["body"].local_to_world(body["body"].center_of_gravity))
+
+    def voxelize_bodies(self):
+        for body in self.bodies:
+            if body["voxels"] is []:
+                if body["shape"] is "sphere":
+                    body["voxels"] = []
+                elif body["shape"] is "cylinder":
+                    body["voxels"] = []
 
     def add_excitation_force(self):
         for body in self.bodies:
