@@ -1,4 +1,4 @@
-*[Direct from the {{site.github.owner_name}}]({{site.github.owner_url}})*
+*[A Project From {{site.github.owner_name}}]({{site.github.owner_url}})*
 
 **Contributors:** {% for member in site.github.contributors %} [{{ member.login }}]({{ member.html_url }}){% endfor %}
 
