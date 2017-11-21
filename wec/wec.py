@@ -6,6 +6,7 @@ from heuristic_bursts.abstract_base_solution import AbstractBaseSolution
 import wec.spectrum as sp
 import wec.excitation_forces as ef
 import pkg_resources
+import random
 
 import wec.wec_visual
 import time
@@ -113,7 +114,7 @@ class WEC(AbstractBaseSolution):
         b = self.bodies[idxb]["body"]
         temp_pto = pm.constraint.DampedSpring(a, b, a.center_of_gravity, b.center_of_gravity,
                                               resting_length, stiffness, damping)
-        temp_pto.collide_bodies = False
+        temp_pto.collide_bodies = True
         temp_pto.error_bias = self.error_bias
         # Add damped spring to simulation and stored lists
         self.world.add(temp_pto)
@@ -129,7 +130,7 @@ class WEC(AbstractBaseSolution):
         temp_groove = pm.constraint.GrooveJoint(a, b, a.center_of_gravity,
                                                 a.center_of_gravity + 2 * (b.position - a.position),
                                                 b.center_of_gravity)
-        temp_groove.collide_bodies = False
+        temp_groove.collide_bodies = True
         temp_groove.error_bias = self.error_bias
         # Add first groove to simulation and stored list
         self.world.add(temp_groove)
@@ -138,7 +139,7 @@ class WEC(AbstractBaseSolution):
         temp_groove = pm.constraint.GrooveJoint(b, a, b.center_of_gravity,
                                                 b.center_of_gravity + 2 * (a.position - b.position),
                                                 a.center_of_gravity)
-        temp_groove.collide_bodies = False
+        temp_groove.collide_bodies = True
         temp_groove.error_bias = self.error_bias
         # Add second groove to simulation and stored list
         self.world.add(temp_groove)
@@ -150,7 +151,7 @@ class WEC(AbstractBaseSolution):
         a = self.bodies[idxa]["body"]
         b = self.bodies[idxb]["body"]
         temp_pto = pm.constraint.DampedRotarySpring(a, b, rest_angle, stiffness, damping)
-        temp_pto.collide_bodies = False
+        temp_pto.collide_bodies = True
         temp_pto.error_bias = self.error_bias
         # Add damped rotary spring to simulation and stored lists
         self.world.add(temp_pto)
@@ -166,7 +167,7 @@ class WEC(AbstractBaseSolution):
         acg = a.local_to_world(a.center_of_gravity)
         bcg = b.local_to_world(b.center_of_gravity)
         temp_pivot = pm.constraint.PivotJoint(a, b, 0.5 * (acg + bcg))
-        temp_pivot.collide_bodies = False
+        temp_pivot.collide_bodies = True
         temp_pivot.error_bias = self.error_bias
         # Add pivot to simulation and stored list
         self.world.add(temp_pivot)
@@ -284,7 +285,6 @@ class WEC(AbstractBaseSolution):
         for cable in self.cable_bodies:
             attachment_body = self.mooring_attachment_points[mooring_index]
             if attachment_body is body_index:
-                print('yes')
                 temp_fixed_body = self.fixed_bodies[mooring_index]
                 self.remove_mooring_system(mooring_index)
                 self.add_mooring_system(temp_fixed_body["body"].position, body_index, cable.stiffness, cable.damping)
@@ -481,7 +481,6 @@ class WEC(AbstractBaseSolution):
     # LUCAS: Higher tier operations will go here eventually too. These should follow the function definitions as defined
     #        in the abstract base solution class.
 
-
     def add_buoyant_force(self):
         for body in self.bodies:
             # TODO Add general computation that is voxel-based
@@ -631,3 +630,219 @@ class WEC(AbstractBaseSolution):
 
     def __deepcopy__(self):
         asdf = 1
+
+    def rule_select(self):
+        num_rules = 12
+        rule = random.randint(1, num_rules)
+        return rule
+
+    def rule_perform(self, rule):
+        y_min = 50
+        y_max = self.sea_level
+        x_min = 0
+        x_max = 800
+        radius_min = 5
+        radius_max = 25
+        length_min = 1
+        length_max = 100
+        angle_min = 0
+        angle_max = 90
+        density_min = 500
+        density_max = 1200
+        rest_angle = 0
+        stiffness_min = 100
+        stiffness_max = 10000
+        damping_min = 1000000
+        damping_max = 100000000
+        mooring_depth = 50
+
+        valid_rule = False
+
+        # Add rotational body
+        if rule == 1:
+            shape_select = random.randint(0, 0)
+            if shape_select == 0:
+                shape = 'sphere'
+            else:
+                shape = 'cylinder'
+            density = random.randint(density_min, density_max)
+            length = random.randint(length_min, length_max)
+            angle = random.randint(angle_min, angle_max)
+            while not valid_rule:
+                body = random.randint(0, len(self.bodies)-1)
+                body_position = self.bodies[body]['body'].position
+                body_radius = self.bodies[body]['radius']
+                radius = random.randint(radius_min, radius_max)
+                new_body_placement = random.randint(0, 1)
+                if new_body_placement == 0:
+                    y = body_position[1]
+                    new_body_placement = random.randint(0, 1)
+                    if new_body_placement == 0:
+                        x = body_position[0] - body_radius - radius
+                    else:
+                        x = body_position[0] + body_radius + radius
+                else:
+                    x = body_position[0]
+                    new_body_placement = random.randint(0, 1)
+                    if new_body_placement == 0:
+                        y = body_position[1] - body_radius - radius
+                    else:
+                        y = body_position[1] + body_radius + radius
+                for body_to_check in self.bodies:
+                    body_pos = body_to_check['body'].position
+                    body_radius = body_to_check['radius']
+                    d = np.sqrt((body_pos[0]-x)**2 + (body_pos[1]-y)**2)
+                    if d >= radius + body_radius:
+                        valid_rule = True
+                    else:
+                        valid_rule = False
+                        break
+
+            stiffness = random.randint(stiffness_min, stiffness_max)
+            damping = random.randint(damping_min, damping_max)
+
+            self.add_rotational_body(shape, density, (x, y), body, rest_angle, stiffness, damping,
+                                     radius=radius, length=length, angle_offset=angle)
+
+        # Add linear body
+        elif rule == 2:
+            shape_select = random.randint(0, 0)
+            if shape_select == 0:
+                shape = 'sphere'
+            else:
+                shape = 'cylinder'
+            density = random.randint(density_min, density_max)
+            length = random.randint(length_min, length_max)
+            angle = random.randint(angle_min, angle_max)
+
+            while not valid_rule:
+                body = random.randint(0, len(self.bodies)-1)
+                body_position = self.bodies[body]['body'].position
+                body_radius = self.bodies[body]['radius']
+                radius = random.randint(radius_min, radius_max)
+                new_body_placement = random.randint(0, 1)
+                if new_body_placement == 0:
+                    y = body_position[1]
+                    new_body_placement = random.randint(0, 1)
+                    if new_body_placement == 0:
+                        x = body_position[0] - body_radius - radius
+                    else:
+                        x = body_position[0] + body_radius + radius
+                else:
+                    x = body_position[0]
+                    new_body_placement = random.randint(0, 1)
+                    if new_body_placement == 0:
+                        y = body_position[1] - body_radius - radius
+                    else:
+                        y = body_position[1] + body_radius + radius
+                for body_to_check in self.bodies:
+                    body_pos = body_to_check['body'].position
+                    body_radius = body_to_check['radius']
+                    d = np.sqrt((body_pos[0]-x)**2 + (body_pos[1]-y)**2)
+                    if d >= radius + body_radius:
+                        valid_rule = True
+                    else:
+                        valid_rule = False
+                        break
+
+            stiffness = random.randint(stiffness_min, stiffness_max)
+            damping = random.randint(damping_min, damping_max)
+            self.add_linear_body(shape, density, (x,y), body, stiffness, damping,
+                                 radius=radius, length=length, angle_offset=angle)
+
+        # Delete body with joint
+        elif rule == 3:
+            if len(self.bodies) > 1:
+                while not valid_rule:
+                    connections = 0
+                    body = random.randint(0, len(self.bodies)-1)
+                    i = 0
+                    for pto in self.rotary_ptos_data:
+                        if pto['idxa'] == body or pto['idxb'] == body:
+                            connections += 1
+                            pto_index = i
+                            type = 'rotational'
+                        i += 1
+                    i = 0
+                    for pto in self.linear_ptos_data:
+                        if pto['idxa'] == body or pto['idxb'] == body:
+                            connections += 1
+                            pto_index = i
+                            type = 'linear'
+                        i += 1
+                    if connections == 1:
+                        self.remove_body_with_joint(body, pto_index, type)
+                        valid_rule = True
+
+        # Change joint type
+        elif rule == 4:
+            if len(self.rotary_ptos) > 0 or len(self.linear_ptos) > 0:
+                while not valid_rule:
+                    type_select = random.randint(0, 1)
+                    if type_select == 0 and len(self.rotary_ptos) > 0:
+                        pto = random.randint(0, len(self.rotary_ptos)-1)
+                        self.change_joint_type(pto, 'rotational')
+                        valid_rule = True
+                    elif type_select == 1 and len(self.linear_ptos) > 0:
+                        pto = random.randint(0, len(self.linear_ptos)-1)
+                        self.change_joint_type(pto, 'linear')
+                        valid_rule = True
+
+
+        # Change body dimensions
+        elif rule == 5:
+            pass
+
+        # Change body density
+        elif rule == 6:
+            body = random.randint(0, len(self.bodies)-1)
+            density = random.randint(density_min, density_max)
+            self.change_body_density(body, density)
+
+        # Relocate body with joint
+        elif rule == 7:
+            pass
+
+        # Swap bodies
+        elif rule == 8:
+            pass
+            # if len(self.bodies) > 1:
+            #     body_a = random.randint(0, len(self.bodies)-1)
+            #     while True:
+            #         body_b = random.randint(0, len(self.bodies)-1)
+            #         if body_a != body_b:
+            #             break
+            #     self.swap_bodies(body_a, body_b)
+
+        # Add mooring system
+        elif rule == 9:
+            if len(self.bodies) > 0:
+                x = random.randint(x_min, x_max)
+                y = mooring_depth
+                body = random.randint(0, len(self.bodies)-1)
+                stiffness = random.randint(stiffness_min, stiffness_max)
+                damping = random.randint(damping_min, damping_max)
+                self.add_mooring_system((x, y), body, stiffness, damping)
+
+        # Delete mooring system
+        elif rule == 10:
+            if len(self.mooring_attachment_points) > 0:
+                mooring = random.randint(0, len(self.mooring_attachment_points)-1)
+                self.remove_mooring_system(mooring)
+
+        # Relocate cable attachment point
+        elif rule == 11:
+            if len(self.mooring_attachment_points) > 0:
+                mooring = random.randint(0, len(self.mooring_attachment_points)-1)
+                body = random.randint(0, len(self.bodies)-1)
+                self.relocate_mooring_cable_attachment(mooring, body)
+
+        # Relocate fixed body
+        elif rule == 12:
+            if len(self.mooring_attachment_points) > 0:
+                x = random.randint(x_min, x_max)
+                y = mooring_depth
+                mooring = random.randint(0, len(self.mooring_attachment_points)-1)
+                self.relocate_mooring_fixed_body(mooring, (x, y))
+
+

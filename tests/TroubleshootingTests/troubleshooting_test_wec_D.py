@@ -1,18 +1,29 @@
 # This test is for quickly testing functionality of individual rules
 import wec.wec
 import wec.wec_visual
+import time
 
 
 def test_simulation_of_wec():
     device = wec.wec.WEC()
+    display = wec.wec_visual.wec_visual()
+    display.display(device)
 
-    device.add_body('cylinder', 500.0, (400, 400), radius=50, length=100, angle_offset=0)
-    device.add_linear_body('sphere', 650, (500, 400), 0, 1000, 10000000, radius=50)
-    device.add_rotational_body('sphere', 650, (600, 400), 1, 0, 1000, 10000000, radius=50)
-    device.add_linear_body('cylinder', 500, (700, 400), 2, 1000, 10000000, radius=50, length=100, angle_offset=0)
-    device.relocate_body_with_joint(3, 1, 'linear', (300, 400), 0)
-    device.change_body_dimensions(3, radius=50, length=50, angle_offset=0)
-    device.swap_bodies(3, 1)
+    device.add_body('sphere', 650.0, (400, 400), radius=25)
+    # device.add_rotational_body('sphere', 650, (450, 400), 0, 0, 1000, 10000000, radius=25)
+    # device.add_rotational_body('sphere', 650, (500, 400), 1, 0, 1000, 10000000, radius=25)
+    # device.add_rotational_body('sphere', 650, (550, 400), 2, 0, 1000, 10000000, radius=25)
+    # device.add_rotational_body('sphere', 650, (600, 400), 3, 0, 1000, 10000000, radius=25)
+
+    for i in range(0, 20):
+        rule = device.rule_select()
+        device.rule_perform(rule)
+        display.display(device)
+        time.sleep(.5)
+    # device.rule_perform(3)
+    # device.rule_perform(2)
+    # device.rule_perform(1)
+    # device.rule_perform(2)
 
     device.display_visual = True
     device.evaluate()
