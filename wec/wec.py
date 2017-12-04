@@ -14,6 +14,7 @@ import time
 class WEC(AbstractBaseSolution):
     simulation_dt = 0.1
     simulation_steps = 1000
+    initial_steps = 10000
     error_bias = 0.02
     spectrum = sp.Spectrum('bretschneider', fp=0.5, Hm0=2)
     forces = ef.ExcitationForces()
@@ -46,6 +47,8 @@ class WEC(AbstractBaseSolution):
         self.groove_joints = []
         self.linear_ptos_data = []
         self.rotary_ptos_data = []
+        self.addition_locations = []
+        self.deletable_bodies = []
 
         # Initialize lists for mooring system
         self.fixed_bodies = []
@@ -101,7 +104,7 @@ class WEC(AbstractBaseSolution):
                             "radius": radius,
                             "length": length,
                             "angle_offset": angle_offset,
-                            "xyz": np.zeros((self.simulation_steps, 2)),
+                            "xyz": np.zeros((self.simulation_steps + self.initial_steps, 2)),
                             "last_velocity": np.zeros(2),
                             "last_position": np.zeros(2),
                             "shape": shape,
@@ -229,6 +232,144 @@ class WEC(AbstractBaseSolution):
             del self.groove_joints[index * 2]
             del self.groove_joints[index * 2]
 
+    def repositioning(self, index, initial_body, new_body):
+        for relative_position in range(0, 4):
+            self.reposition_branch(index, relative_position, initial_body, new_body)
+
+        # self.create_relation_chains(index)
+        # print('Final chain list: ', self.all_chains)
+
+        # shifted_bodies = []
+        # initial_x_shifted = 0
+        # initial_y_shifted = 0
+        # shift_x = False
+        # shift_y = False
+        #
+        # for i in range(0, len(self.bodies)):
+        #     check_body = self.bodies[i]
+        #     check_body_pos = check_body['body'].position
+        #     check_body_radius = check_body['radius']
+        #     distance = np.sqrt((old_pos[0]-check_body_pos[0])**2 + (old_pos[1]-check_body_pos[1])**2)
+        #     if check_body_radius + R1 == distance:
+        #         if old_pos[0] - distance == check_body_pos[0]:
+        #             shift_x = True
+        #         elif old_pos[1] + distance == check_body_pos[1]:
+        #             shift_y = True
+        #
+        # if shift_x:
+        #     new_pos[0] += rad_diff
+        #     initial_x_shifted += rad_diff
+        # if shift_y:
+        #     new_pos[1] -= rad_diff
+        #     initial_y_shifted -= rad_diff
+        # new_body['body'].position = new_pos
+        #
+        # self.remove_body(index)
+        # self.add_body(new_body['body_shape'], new_body['density'], new_body['body'].position,
+        #               radius=new_body['radius'], length=new_body['length'], angle_offset=new_body['angle_offset'])
+        # self.bodies.insert(index, self.bodies[-1])
+        # del self.bodies[-1]
+        # shifted_bodies.append(index)
+        # self.joint_reinstancing(index)
+        #
+        # chains_list = []
+        # for chain in chains_list:
+        #     shift_x = False
+        #     shift_y = False
+        #     pos_a = self.bodies[chain[0]]['body'].position
+        #     pos_b = self.bodies[chain[1]]['body'].position
+        #     if pos_a[1] == pos_b[1]:
+        #         shift_x = True
+        #     if pos_a[0] == pos_b[0]:
+        #         shift_y = True
+        #     for body in chain:
+        #         if body not in shifted_bodies:
+        #             temp_body = self.bodies[body]
+        #             temp_body_pos = temp_body['body'].position
+        #             temp_body_pos[0] += initial_x_shifted
+        #             temp_body_pos[1] += initial_y_shifted
+        #             if shift_x:
+        #                 temp_body_pos[0] += rad_diff
+        #             if shift_y:
+        #                 temp_body_pos[1] += -rad_diff
+        #
+        #             self.remove_body(body)
+        #             self.add_body(temp_body['body_shape'], temp_body['density'], temp_body_pos,
+        #                           radius=temp_body['radius'], length=temp_body['length'], angle_offset=temp_body['angle_offset'])
+        #             self.bodies.insert(body, self.bodies[-1])
+        #             del self.bodies[-1]
+        #             shifted_bodies.append(body)
+        #             self.joint_reinstancing(body)
+        #             self.mooring_reinstancing(body)
+
+    def reposition_branch(self, body_index, relative_position, initial_body, new_body):
+        old_pos = initial_body['body'].position
+        R1 = initial_body['radius']
+        R2 = new_body['radius']
+        rad_diff = R2 - R1
+
+        bodies_to_check = []
+        bodies_to_shift = []
+
+        for i in range(0, len(self.bodies)):
+            test_body = self.bodies[i]
+            test_body_pos = test_body['body'].position
+            test_body_radius = test_body['radius']
+            distance = np.sqrt((old_pos[0] - test_body_pos[0]) ** 2 + (old_pos[1] - test_body_pos[1]) ** 2)
+            if distance == R1 + test_body_radius:
+                if test_body_pos[1] == old_pos[1] and test_body_pos[0] > old_pos[0] and relative_position == 0:
+                    bodies_to_check.append(i)
+                    bodies_to_shift.append(i)
+                    break
+                elif test_body_pos[0] == old_pos[0] and test_body_pos[1] > old_pos[1] and relative_position == 1:
+                    bodies_to_check.append(i)
+                    bodies_to_shift.append(i)
+                    break
+                elif test_body_pos[1] == old_pos[1] and test_body_pos[0] < old_pos[0] and relative_position == 2:
+                    bodies_to_check.append(i)
+                    bodies_to_shift.append(i)
+                    break
+                elif test_body_pos[0] == old_pos[0] and test_body_pos[1] < old_pos[1] and relative_position == 3:
+                    bodies_to_check.append(i)
+                    bodies_to_shift.append(i)
+                    break
+
+        while len(bodies_to_check) > 0:
+            a = bodies_to_check[0]
+            for b in range(0, len(self.bodies)):
+                for pto in self.rotary_ptos_data:
+                    if ((pto['idxa'] == a and pto['idxb'] == b) or (pto['idxa'] == b and pto['idxb'] == a)) and (b not in bodies_to_check) and (b not in bodies_to_shift) and b != body_index:
+                        bodies_to_check.append(b)
+                        bodies_to_shift.append(b)
+                for pto in self.linear_ptos_data:
+                    if ((pto['idxa'] == a and pto['idxb'] == b) or (pto['idxa'] == b and pto['idxb'] == a)) and (b not in bodies_to_check) and (b not in bodies_to_shift) and b != body_index:
+                        bodies_to_check.append(b)
+                        bodies_to_shift.append(b)
+            del bodies_to_check[0]
+
+        while len(bodies_to_shift) > 0:
+            temp_body_index = bodies_to_shift[0]
+            temp_body = self.bodies[temp_body_index]
+            temp_body_pos = temp_body['body'].position
+
+            if relative_position == 0:
+                temp_body_pos[0] += rad_diff
+            elif relative_position == 1:
+                temp_body_pos[1] += rad_diff
+            elif relative_position == 2:
+                temp_body_pos[0] -= rad_diff
+            elif relative_position == 3:
+                temp_body_pos[1] -= rad_diff
+
+            self.remove_body(temp_body_index)
+            self.add_body(temp_body['body_shape'], temp_body['density'], temp_body_pos,
+                          radius=temp_body['radius'], length=temp_body['length'], angle_offset=temp_body['angle_offset'])
+            self.bodies.insert(temp_body_index, self.bodies[-1])
+            del self.bodies[-1]
+            self.joint_reinstancing(temp_body_index)
+            self.mooring_reinstancing(temp_body_index)
+            del bodies_to_shift[0]
+
     def joint_reinstancing(self, body_index):
         joint_index = 0
         for pto in self.rotary_ptos_data:
@@ -333,13 +474,14 @@ class WEC(AbstractBaseSolution):
 
     def change_body_dimensions(self, index, **kwargs):
         temp_body = self.bodies[index]
+        initial_body = temp_body
         self.remove_body(index)
         self.add_body(temp_body['body_shape'], temp_body['density'], temp_body['body'].position, **kwargs)
         temp_body = self.bodies[-1]
+        new_body = temp_body
         self.bodies.insert(index, temp_body)
         del self.bodies[-1]
-        self.joint_reinstancing(index)
-        self.mooring_reinstancing(index)
+        self.repositioning(index, initial_body, new_body)
 
     def change_body_density(self, index, density):
         temp_body = self.bodies[index]
@@ -359,33 +501,65 @@ class WEC(AbstractBaseSolution):
         radius = temp_body["radius"]
         length = temp_body["length"]
         angle_offset = temp_body["angle_offset"]
-        self.add_body(shape, density, new_position, radius=radius, length=length, angle_offset=angle_offset)
-        self.bodies.insert(body_index, self.bodies[-1])
 
         if joint_type is 'rotational':
             temp_joint = self.rotary_ptos_data[joint_index]
-            self.remove_body_with_joint(body_index + 1, joint_index, joint_type)
-            self.add_rotational_pto(body_index, attach_body_index, temp_joint["rest_angle"],
+            self.remove_joint(joint_index, joint_type)
+            self.remove_body(body_index)
+            self.add_body(shape, density, new_position, radius=radius, length=length, angle_offset=angle_offset)
+            temp_body = self.bodies[-1]
+            self.bodies.insert(body_index, temp_body)
+            del self.bodies[-1]
+            self.add_rotational_pto(attach_body_index, body_index, temp_joint["rest_angle"],
                                     temp_joint["stiffness"], temp_joint["damping"])
+            temp_joint = self.rotary_ptos[-1]
+            temp_joint_data = self.rotary_ptos_data[-1]
+            temp_pivot = self.pivot_joints[-1]
+            self.rotary_ptos.insert(joint_index, temp_joint)
+            self.rotary_ptos_data.insert(joint_index, temp_joint_data)
+            self.pivot_joints.insert(joint_index, temp_pivot)
+            del self.rotary_ptos[-1]
+            del self.rotary_ptos_data[-1]
+            del self.pivot_joints[-1]
 
         elif joint_type is 'linear':
             temp_joint = self.linear_ptos_data[joint_index]
-            self.remove_body_with_joint(body_index + 1, joint_index, joint_type)
+            self.remove_joint(joint_index, joint_type)
+            self.remove_body(body_index)
+            self.add_body(shape, density, new_position, radius=radius, length=length, angle_offset=angle_offset)
+            temp_body = self.bodies[-1]
+            self.bodies.insert(body_index, temp_body)
+            del self.bodies[-1]
             pos_a = self.bodies[body_index]["body"].position
             pos_b = self.bodies[attach_body_index]["body"].position
             resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2)
             self.add_constrained_linear_pto(body_index, attach_body_index, resting_length,
                                             temp_joint["stiffness"], temp_joint["damping"])
+            temp_joint = self.linear_ptos[-1]
+            temp_joint_data = self.linear_ptos_data[-1]
+            temp_groove_a = self.groove_joints[-2]
+            temp_groove_b = self.groove_joints[-1]
+            self.linear_ptos.insert(joint_index, temp_joint)
+            self.linear_ptos_data.insert(joint_index, temp_joint_data)
+            self.groove_joints.insert(joint_index * 2, temp_groove_a)
+            self.groove_joints.insert(joint_index * 2 + 1, temp_groove_b)
+            del self.linear_ptos[-1]
+            del self.linear_ptos_data[-1]
+            del self.groove_joints[-1]
+            del self.groove_joints[-1]
         self.mooring_reinstancing(body_index)
 
     def swap_bodies(self, idxa, idxb):
         temp_body_a = self.bodies[idxa]
         temp_body_b = self.bodies[idxb]
+        initial_body_a = temp_body_a
+        initial_body_b = temp_body_b
 
         self.remove_body(idxa)
         self.add_body(temp_body_b['body_shape'], temp_body_b['density'], temp_body_a['body'].position,
                       radius=temp_body_b['radius'], length=temp_body_b['length'], angle_offset=temp_body_b['angle_offset'])
         temp_body = self.bodies[-1]
+        new_body_a = temp_body
         self.bodies.insert(idxa, temp_body)
         del self.bodies[-1]
 
@@ -393,9 +567,12 @@ class WEC(AbstractBaseSolution):
         self.add_body(temp_body_a['body_shape'], temp_body_a['density'], temp_body_b['body'].position,
                       radius=temp_body_a['radius'], length=temp_body_a['length'], angle_offset=temp_body_a['angle_offset'])
         temp_body = self.bodies[-1]
+        new_body_b = temp_body
         self.bodies.insert(idxb, temp_body)
         del self.bodies[-1]
 
+        self.repositioning(idxa, initial_body_a, new_body_a)
+        self.repositioning(idxb, initial_body_b, new_body_b)
         self.joint_reinstancing(idxa)
         self.joint_reinstancing(idxb)
         self.mooring_reinstancing(idxa)
@@ -480,6 +657,19 @@ class WEC(AbstractBaseSolution):
 
     # LUCAS: Higher tier operations will go here eventually too. These should follow the function definitions as defined
     #        in the abstract base solution class.
+
+    def create_initial_design(self, num_rules):
+        for i in range(1, num_rules):
+            rule = self.rule_select()
+            self.rule_perform(rule)
+            print('Validity: ', self.is_valid())
+
+    def change_design_scale(self):
+        min_multiplier = 0.25
+        max_multiplier = 4.0
+
+
+    # End of higher-tier operations
 
     def add_buoyant_force(self):
         for body in self.bodies:
@@ -570,7 +760,7 @@ class WEC(AbstractBaseSolution):
         if self.display_visual:
             self.display = wec.wec_visual.wec_visual()
 
-        while self.iter < self.simulation_steps:
+        while self.iter < self.simulation_steps + self.initial_steps:
 
             if self.display_visual:
                 self.display.display(self)
@@ -600,13 +790,14 @@ class WEC(AbstractBaseSolution):
             # Pull position data
             self.pull_position_data()
 
-            # Track PTO energy extraction
-            for pto in self.linear_ptos:
-                relative_velocity = np.linalg.norm(pto.a.velocity - pto.b.velocity)
-                energy[0] += np.power(relative_velocity, 2) * pto.damping * self.simulation_dt
-            for pto in self.rotary_ptos:
-                relative_velocity = np.abs(pto.a.angular_velocity - pto.b.angular_velocity)
-                energy[1] += np.power(relative_velocity, 2) * pto.damping * self.simulation_dt
+            # Track PTO energy extraction after reaching steady-state
+            if self.iter > self.initial_steps:
+                for pto in self.linear_ptos:
+                    relative_velocity = np.linalg.norm(pto.a.velocity - pto.b.velocity)
+                    energy[0] += np.power(relative_velocity, 2) * pto.damping * self.simulation_dt
+                for pto in self.rotary_ptos:
+                    relative_velocity = np.abs(pto.a.angular_velocity - pto.b.angular_velocity)
+                    energy[1] += np.power(relative_velocity, 2) * pto.damping * self.simulation_dt
 
             self.iter += 1
 
@@ -632,8 +823,9 @@ class WEC(AbstractBaseSolution):
         asdf = 1
 
     def rule_select(self):
-        num_rules = 12
+        num_rules = 8
         rule = random.randint(1, num_rules)
+        print(rule)
         return rule
 
     def rule_perform(self, rule):
@@ -666,40 +858,29 @@ class WEC(AbstractBaseSolution):
             else:
                 shape = 'cylinder'
             density = random.randint(density_min, density_max)
+            radius = random.randint(radius_min, radius_max)
             length = random.randint(length_min, length_max)
             angle = random.randint(angle_min, angle_max)
-            while not valid_rule:
-                body = random.randint(0, len(self.bodies)-1)
-                body_position = self.bodies[body]['body'].position
-                body_radius = self.bodies[body]['radius']
-                radius = random.randint(radius_min, radius_max)
-                new_body_placement = random.randint(0, 1)
-                if new_body_placement == 0:
-                    y = body_position[1]
-                    new_body_placement = random.randint(0, 1)
-                    if new_body_placement == 0:
-                        x = body_position[0] - body_radius - radius
-                    else:
-                        x = body_position[0] + body_radius + radius
-                else:
-                    x = body_position[0]
-                    new_body_placement = random.randint(0, 1)
-                    if new_body_placement == 0:
-                        y = body_position[1] - body_radius - radius
-                    else:
-                        y = body_position[1] + body_radius + radius
-                for body_to_check in self.bodies:
-                    body_pos = body_to_check['body'].position
-                    body_radius = body_to_check['radius']
-                    d = np.sqrt((body_pos[0]-x)**2 + (body_pos[1]-y)**2)
-                    if d >= radius + body_radius:
-                        valid_rule = True
-                    else:
-                        valid_rule = False
-                        break
-
             stiffness = random.randint(stiffness_min, stiffness_max)
             damping = random.randint(damping_min, damping_max)
+
+            self.rule_check()
+            location = self.addition_locations[random.randint(0, len(self.addition_locations)-1)]
+            body = location[0]
+            body_pos = self.bodies[body]['body'].position
+            body_radius = self.bodies[body]['radius']
+            if location[1] == 0:
+                x = body_pos[0] + body_radius + radius
+                y = body_pos[1]
+            elif location[1] == 1:
+                x = body_pos[0]
+                y = body_pos[1] + body_radius + radius
+            elif location[1] == 2:
+                x = body_pos[0] - body_radius - radius
+                y = body_pos[1]
+            elif location[1] == 3:
+                x = body_pos[0]
+                y = body_pos[1] - body_radius - radius
 
             self.add_rotational_body(shape, density, (x, y), body, rest_angle, stiffness, damping,
                                      radius=radius, length=length, angle_offset=angle)
@@ -712,67 +893,39 @@ class WEC(AbstractBaseSolution):
             else:
                 shape = 'cylinder'
             density = random.randint(density_min, density_max)
+            radius = random.randint(radius_min, radius_max)
             length = random.randint(length_min, length_max)
             angle = random.randint(angle_min, angle_max)
-
-            while not valid_rule:
-                body = random.randint(0, len(self.bodies)-1)
-                body_position = self.bodies[body]['body'].position
-                body_radius = self.bodies[body]['radius']
-                radius = random.randint(radius_min, radius_max)
-                new_body_placement = random.randint(0, 1)
-                if new_body_placement == 0:
-                    y = body_position[1]
-                    new_body_placement = random.randint(0, 1)
-                    if new_body_placement == 0:
-                        x = body_position[0] - body_radius - radius
-                    else:
-                        x = body_position[0] + body_radius + radius
-                else:
-                    x = body_position[0]
-                    new_body_placement = random.randint(0, 1)
-                    if new_body_placement == 0:
-                        y = body_position[1] - body_radius - radius
-                    else:
-                        y = body_position[1] + body_radius + radius
-                for body_to_check in self.bodies:
-                    body_pos = body_to_check['body'].position
-                    body_radius = body_to_check['radius']
-                    d = np.sqrt((body_pos[0]-x)**2 + (body_pos[1]-y)**2)
-                    if d >= radius + body_radius:
-                        valid_rule = True
-                    else:
-                        valid_rule = False
-                        break
-
             stiffness = random.randint(stiffness_min, stiffness_max)
             damping = random.randint(damping_min, damping_max)
-            self.add_linear_body(shape, density, (x,y), body, stiffness, damping,
+
+            self.rule_check()
+            location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
+            body = location[0]
+            body_pos = self.bodies[body]['body'].position
+            body_radius = self.bodies[body]['radius']
+            if location[1] == 0:
+                x = body_pos[0] + body_radius + radius
+                y = body_pos[1]
+            elif location[1] == 1:
+                x = body_pos[0]
+                y = body_pos[1] + body_radius + radius
+            elif location[1] == 2:
+                x = body_pos[0] - body_radius - radius
+                y = body_pos[1]
+            elif location[1] == 3:
+                x = body_pos[0]
+                y = body_pos[1] - body_radius - radius
+
+            self.add_linear_body(shape, density, (x, y), body, stiffness, damping,
                                  radius=radius, length=length, angle_offset=angle)
 
         # Delete body with joint
         elif rule == 3:
             if len(self.bodies) > 1:
-                while not valid_rule:
-                    connections = 0
-                    body = random.randint(0, len(self.bodies)-1)
-                    i = 0
-                    for pto in self.rotary_ptos_data:
-                        if pto['idxa'] == body or pto['idxb'] == body:
-                            connections += 1
-                            pto_index = i
-                            type = 'rotational'
-                        i += 1
-                    i = 0
-                    for pto in self.linear_ptos_data:
-                        if pto['idxa'] == body or pto['idxb'] == body:
-                            connections += 1
-                            pto_index = i
-                            type = 'linear'
-                        i += 1
-                    if connections == 1:
-                        self.remove_body_with_joint(body, pto_index, type)
-                        valid_rule = True
+                self.rule_check()
+                removal = self.deletable_bodies[random.randint(0, len(self.deletable_bodies)-1)]
+                self.remove_body_with_joint(removal[0], removal[1], removal[2])
 
         # Change joint type
         elif rule == 4:
@@ -788,10 +941,14 @@ class WEC(AbstractBaseSolution):
                         self.change_joint_type(pto, 'linear')
                         valid_rule = True
 
-
         # Change body dimensions
         elif rule == 5:
-            pass
+            if len(self.bodies) > 0:
+                body = random.randint(0, len(self.bodies)-1)
+                radius = random.randint(radius_min, radius_max)
+                length = random.randint(length_min, length_max)
+                angle = random.randint(angle_min, angle_max)
+                self.change_body_dimensions(body, radius=radius, length=length, angle=angle)
 
         # Change body density
         elif rule == 6:
@@ -801,18 +958,41 @@ class WEC(AbstractBaseSolution):
 
         # Relocate body with joint
         elif rule == 7:
-            pass
+            if len(self.bodies) > 1:
+                self.rule_check()
+                removal = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
+                while True:
+                    location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
+                    attachment_body = location[0]
+                    if attachment_body != removal[0]:
+                        break
+
+                attachment_body_pos = self.bodies[attachment_body]['body'].position
+                attachment_body_radius = self.bodies[attachment_body]['radius']
+                radius = self.bodies[removal[0]]['radius']
+                if location[1] == 0:
+                    x = attachment_body_pos[0] + attachment_body_radius + radius
+                    y = attachment_body_pos[1]
+                elif location[1] == 1:
+                    x = attachment_body_pos[0]
+                    y = attachment_body_pos[1] + attachment_body_radius + radius
+                elif location[1] == 2:
+                    x = attachment_body_pos[0] - attachment_body_radius - radius
+                    y = attachment_body_pos[1]
+                elif location[1] == 3:
+                    x = attachment_body_pos[0]
+                    y = attachment_body_pos[1] - attachment_body_radius - radius
+                self.relocate_body_with_joint(removal[0], removal[1], removal[2], (x, y), attachment_body)
 
         # Swap bodies
         elif rule == 8:
-            pass
-            # if len(self.bodies) > 1:
-            #     body_a = random.randint(0, len(self.bodies)-1)
-            #     while True:
-            #         body_b = random.randint(0, len(self.bodies)-1)
-            #         if body_a != body_b:
-            #             break
-            #     self.swap_bodies(body_a, body_b)
+            if len(self.bodies) > 1:
+                body_a = random.randint(0, len(self.bodies)-1)
+                while True:
+                    body_b = random.randint(0, len(self.bodies)-1)
+                    if body_a != body_b:
+                        break
+                self.swap_bodies(body_a, body_b)
 
         # Add mooring system
         elif rule == 9:
@@ -845,4 +1025,81 @@ class WEC(AbstractBaseSolution):
                 mooring = random.randint(0, len(self.mooring_attachment_points)-1)
                 self.relocate_mooring_fixed_body(mooring, (x, y))
 
+    def is_valid(self):
+        validity = True
+        for body_a in self.world.shapes:
+            for body_b in self.world.shapes:
+                collision = body_a.shapes_collide(body_b)
+                if (collision.normal[0] != 0 or collision.normal[1] != 0) and body_a != body_b:
+                    validity = False
+                    break
+                else:
+                    validity = True
+            if not validity:
+                break
+        return validity
 
+    def rule_check(self):
+        self.addition_locations = []
+        self.deletable_bodies = []
+
+        for pos_to_check in range(0, 4):
+            for i in range(0, len(self.bodies)):
+                body = self.bodies[i]
+                body_pos = body['body'].position
+                body_radius = body['radius']
+                for j in range(0, len(self.bodies)):
+                    test_body = self.bodies[j]
+                    test_body_pos = test_body['body'].position
+                    test_body_radius = test_body['radius']
+                    distance = np.sqrt((body_pos[0]-test_body_pos[0])**2 + (body_pos[1]-test_body_pos[1])**2)
+                    if distance == body_radius + test_body_radius:
+                        if pos_to_check == 0:
+                            if test_body_pos[0] < body_pos[0] + distance:
+                                valid_location = True
+                            else:
+                                valid_location = False
+                                break
+                        elif pos_to_check == 1:
+                            if test_body_pos[1] < body_pos[1] + distance and body_pos[1] + body_radius < self.sea_level:
+                                valid_location = True
+                            else:
+                                valid_location = False
+                                break
+                        elif pos_to_check == 2:
+                            if test_body_pos[0] > body_pos[0] - distance:
+                                valid_location = True
+                            else:
+                                valid_location = False
+                                break
+                        elif pos_to_check == 3:
+                            if test_body_pos[1] > body_pos[1] - distance:
+                                valid_location = True
+                            else:
+                                valid_location = False
+                                break
+                    else:
+                        valid_location = True
+                    if not valid_location:
+                        break
+                if valid_location:
+                    self.addition_locations.append((i, pos_to_check))
+
+        for n in range(0, len(self.bodies)):
+            connections = 0
+            i = 0
+            for pto in self.rotary_ptos_data:
+                if pto['idxa'] == n or pto['idxb'] == n:
+                    connections += 1
+                    pto_index = i
+                    type = 'rotational'
+                i += 1
+            i = 0
+            for pto in self.linear_ptos_data:
+                if pto['idxa'] == n or pto['idxb'] == n:
+                    connections += 1
+                    pto_index = i
+                    type = 'linear'
+                i += 1
+            if connections == 1:
+                self.deletable_bodies.append((n, pto_index, type))

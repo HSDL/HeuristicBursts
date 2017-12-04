@@ -15,11 +15,7 @@ def test_simulation_of_wec():
     # device.add_rotational_body('sphere', 650, (550, 400), 2, 0, 1000, 10000000, radius=25)
     # device.add_rotational_body('sphere', 650, (600, 400), 3, 0, 1000, 10000000, radius=25)
 
-    for i in range(0, 20):
-        rule = device.rule_select()
-        device.rule_perform(rule)
-        display.display(device)
-        time.sleep(.5)
+    device.create_initial_design(20)
     # device.rule_perform(3)
     # device.rule_perform(2)
     # device.rule_perform(1)
