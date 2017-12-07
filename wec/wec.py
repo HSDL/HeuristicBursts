@@ -391,6 +391,7 @@ class WEC(AbstractBaseSolution):
                 attachment_body = self.mooring_attachment_points[mooring_index]
                 if attachment_body == body_index:
                     self.remove_mooring_system(mooring_index)
+                    break
         self.mooring_index_shift(body_index)
 
     def change_joint_type(self, index, joint_initial_type):
@@ -586,7 +587,7 @@ class WEC(AbstractBaseSolution):
     def relocate_mooring_fixed_body(self, mooring_index, position):
         temp_cable = self.cable_bodies[mooring_index]
         temp_body_index = self.mooring_attachment_points[mooring_index]
-        temp_body = self.bodies[temp_body_index]
+        # temp_body = self.bodies[temp_body_index]
 
         self.remove_mooring_system(mooring_index)
         self.add_mooring_system(position, temp_body_index, temp_cable.stiffness, temp_cable.damping)
@@ -611,9 +612,18 @@ class WEC(AbstractBaseSolution):
             print('Validity: ', self.is_valid())
 
     def change_design_scale(self):
-        min_multiplier = 0.25
-        max_multiplier = 4.0
-        multiplier = random.uniform(min_multiplier, max_multiplier)
+        min_multiplier = 0.5
+        max_multiplier = 2.0
+
+        valid_multiplier = False
+        while not valid_multiplier:
+            multiplier = random.uniform(min_multiplier, max_multiplier)
+            for index in range(0, len(self.bodies)):
+                if int(self.bodies[index]['radius'] * multiplier) < 1:
+                    valid_multiplier = False
+                    break
+                else:
+                    valid_multiplier = True
 
         for index in range(0, len(self.bodies)):
             body = self.bodies[index]
@@ -632,14 +642,73 @@ class WEC(AbstractBaseSolution):
             reduce = True
 
         min_length = 1
-        max_length = 5
+        max_length = 3
         rule_length = random.randint(min_length, max_length)
 
         self.rule_check()
         if extend:
-            pass
-        elif reduce:
-            pass
+            next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
+            for n in range(0, rule_length):
+                body_type = random.randint(0, 1)
+                if body_type == 0:
+                    self.rule_perform(1, location=next_location)
+                elif body_type == 1:
+                    self.rule_perform(2, location=next_location)
+                self.rule_check()
+                added_body_index = len(self.bodies) - 1
+                while next_location[0] is not added_body_index:
+                    next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
+
+        elif reduce and len(self.deletable_bodies) > 0:
+            next_delete = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
+            for n in range(0, rule_length):
+                if len(self.bodies) > 1:
+                    temp_pto = (next_delete[1], next_delete[2])
+                    if temp_pto[1] is 'rotational':
+                        temp_pto = self.rotary_ptos_data[temp_pto[0]]
+                        if temp_pto['idxa'] == next_delete[0]:
+                            temp_next_delete = temp_pto['idxb']
+                        elif temp_pto['idxb'] == next_delete[0]:
+                            temp_next_delete = temp_pto['idxa']
+                    elif temp_pto[1] is 'linear':
+                        temp_pto = self.linear_ptos_data[temp_pto[0]]
+                        if temp_pto['idxa'] == next_delete[0]:
+                            temp_next_delete = temp_pto['idxb']
+                        elif temp_pto['idxb'] == next_delete[0]:
+                            temp_next_delete = temp_pto['idxa']
+
+                    self.rule_perform(3, removal=next_delete)
+
+                    if temp_next_delete > next_delete[0]:
+                        temp_next_delete -= 1
+
+                    if len(self.bodies) > 1:
+                        for body in self.deletable_bodies:
+                            if body[0] == temp_next_delete:
+                                continue_rule = True
+                                break
+                            else:
+                                continue_rule = False
+                    else:
+                        continue_rule = False
+
+                    if continue_rule:
+                        while next_delete[0] is not temp_next_delete:
+                            next_delete = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
+                    else:
+                        break
+
+    def increase_symmetry(self):
+        pass
+
+    def replicate_pattern(self):
+        max_bodies_in_pattern = 4
+        max_num_patterns = 3
+        bodies_in_pattern = random.randint(1, min(max_bodies_in_pattern, len(self.bodies)))
+        num_patterns = random.randint(1, max_num_patterns)
+
+        starting_body = random.randint(0, len(self.bodies)-1)
+
 
     # End of higher-tier operations
 
@@ -800,7 +869,7 @@ class WEC(AbstractBaseSolution):
         print(rule)
         return rule
 
-    def rule_perform(self, rule):
+    def rule_perform(self, rule, **kwargs):
         y_min = 50
         y_max = self.sea_level
         x_min = 0
@@ -837,7 +906,10 @@ class WEC(AbstractBaseSolution):
             damping = random.randint(damping_min, damping_max)
 
             self.rule_check()
-            location = self.addition_locations[random.randint(0, len(self.addition_locations)-1)]
+            if kwargs.get('location') is not None:
+                location = kwargs['location']
+            else:
+                location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
             body = location[0]
             body_pos = self.bodies[body]['body'].position
             body_radius = self.bodies[body]['radius']
@@ -872,7 +944,10 @@ class WEC(AbstractBaseSolution):
             damping = random.randint(damping_min, damping_max)
 
             self.rule_check()
-            location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
+            if kwargs.get('location') is not None:
+                location = kwargs['location']
+            else:
+                location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
             body = location[0]
             body_pos = self.bodies[body]['body'].position
             body_radius = self.bodies[body]['radius']
@@ -895,8 +970,11 @@ class WEC(AbstractBaseSolution):
         # Delete body with joint
         elif rule == 3:
             if len(self.bodies) > 1:
-                self.rule_check()
-                removal = self.deletable_bodies[random.randint(0, len(self.deletable_bodies)-1)]
+                if kwargs.get('removal') is not None:
+                    removal = kwargs['removal']
+                else:
+                    self.rule_check()
+                    removal = self.deletable_bodies[random.randint(0, len(self.deletable_bodies)-1)]
                 self.remove_body_with_joint(removal[0], removal[1], removal[2])
 
         # Change joint type
@@ -991,6 +1069,9 @@ class WEC(AbstractBaseSolution):
 
         # Relocate fixed body
         elif rule == 12:
+            # print("Attachment points: ", self.mooring_attachment_points)
+            # print("Fixed bodies: ", self.fixed_bodies)
+            # print("Cable bodies: ", self.cable_bodies)
             if len(self.mooring_attachment_points) > 0:
                 x = random.randint(x_min, x_max)
                 y = mooring_depth
