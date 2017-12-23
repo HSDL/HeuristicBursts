@@ -11,7 +11,9 @@ import random
 import wec.wec_visual
 import time
 
+
 class WEC(AbstractBaseSolution):
+    # TODO: Update simulation to decrease instabilities
     simulation_dt = 0.1
     simulation_steps = 1000
     initial_steps = 10000
@@ -602,6 +604,10 @@ class WEC(AbstractBaseSolution):
         self.mooring_attachment_points.insert(mooring_index, temp_attachment_index)
         del self.mooring_attachment_points[-1]
 
+    def locate_center_of_gravity(self):
+        # Calculate center of gravity of WEC system by running through each body
+        pass
+
     # LUCAS: Higher tier operations will go here eventually too. These should follow the function definitions as defined
     #        in the abstract base solution class.
 
@@ -632,21 +638,22 @@ class WEC(AbstractBaseSolution):
             angle_offset = int(body['angle_offset'] * multiplier)
             self.change_body_dimensions(index, radius=radius, length=length, angle_offset=angle_offset)
 
-    def extend_or_reduce(self):
-        extend = False
-        reduce = False
+    def increase_or_decrease_complexity(self):
+        # TODO: Add selection to branch out in x, y, or both directions
+        increase = False
+        decrease = False
         decision = random.randint(0, 1)
         if decision == 0:
-            extend = True
+            increase = True
         else:
-            reduce = True
+            decrease = True
 
         min_length = 1
         max_length = 3
         rule_length = random.randint(min_length, max_length)
 
         self.rule_check()
-        if extend:
+        if increase:
             next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
             for n in range(0, rule_length):
                 body_type = random.randint(0, 1)
@@ -659,7 +666,7 @@ class WEC(AbstractBaseSolution):
                 while next_location[0] is not added_body_index:
                     next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
 
-        elif reduce and len(self.deletable_bodies) > 0:
+        elif decrease and len(self.deletable_bodies) > 0:
             next_delete = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
             for n in range(0, rule_length):
                 if len(self.bodies) > 1:
@@ -699,9 +706,12 @@ class WEC(AbstractBaseSolution):
                         break
 
     def increase_symmetry(self):
+        # TODO: Create method to locate center of gravity of system
+        # Then try to branch out and increase symmetry from there
         pass
 
     def replicate_pattern(self):
+        # TODO: Place pattern at one of the ends of the system
         max_bodies_in_pattern = 4
         max_num_patterns = 3
         bodies_in_pattern = random.randint(1, min(max_bodies_in_pattern, len(self.bodies)))
@@ -870,6 +880,8 @@ class WEC(AbstractBaseSolution):
         return rule
 
     def rule_perform(self, rule, **kwargs):
+        # TODO: Use WEC Sim to establish min and max parameter values
+        # TODO: Create default values for kwargs
         y_min = 50
         y_max = self.sea_level
         x_min = 0
