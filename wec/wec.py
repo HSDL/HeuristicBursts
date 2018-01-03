@@ -17,7 +17,7 @@ class WEC(AbstractBaseSolution):
     simulation_dt = 0.1
     simulation_steps = 1000
     initial_steps = 10000
-    error_bias = 0.02
+    error_bias = pow(1.0 - 0.1, 10.0)
     spectrum = sp.Spectrum('bretschneider', fp=0.5, Hm0=2)
     forces = ef.ExcitationForces()
     forces.load_model(pkg_resources.resource_filename('wec', 'data/full_network_structure.yml'),
@@ -33,7 +33,6 @@ class WEC(AbstractBaseSolution):
         self.world = pm.Space()
         self.world.gravity = (0, -9.81)
         self.world.damping = 0.95
-
 
         # Save position history
         self.bodies = []
@@ -782,9 +781,9 @@ class WEC(AbstractBaseSolution):
 
     def add_excitation_force(self):
         for body in self.bodies:
-            if body['body'].position[1] > self.sea_level - 10:
+            if body['body'].position[1] > self.sea_level - body['radius']:
                 body["body"].apply_force_at_world_point(
-                    (0, body['mass'] * np.sin(self.iter / 100 + body['body'].position[0])),
+                    (0, 0.1*body['mass'] * np.sin(self.iter / 100 + body['body'].position[0])),
                     body["body"].local_to_world(body["body"].center_of_gravity))
 
     def add_radiative_force(self):
