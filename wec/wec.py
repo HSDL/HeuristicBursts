@@ -34,6 +34,9 @@ class WEC(AbstractBaseSolution):
         self.world.gravity = (0, -9.81)
         self.world.damping = 0.95
 
+        # Initialize center of gravity of system
+        self.center_of_gravity = (0, 0)
+
         # Save position history
         self.bodies = []
 
@@ -188,7 +191,7 @@ class WEC(AbstractBaseSolution):
         idxb = len(self.bodies) - 1
         pos_a = self.bodies[idxa]["body"].position
         pos_b = self.bodies[idxb]["body"].position
-        resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2) + self.pto_size
+        resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2)
         self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
 
     def remove_body(self, index):
@@ -604,8 +607,19 @@ class WEC(AbstractBaseSolution):
         del self.mooring_attachment_points[-1]
 
     def locate_center_of_gravity(self):
-        # Calculate center of gravity of WEC system by running through each body
-        pass
+        total_x_weighted = 0
+        total_y_weighted = 0
+        total_mass = 0
+
+        for index in range(0, len(self.bodies)):
+            temp_body = self.bodies[index]
+            temp_pos = temp_body['body'].position
+            temp_mass = temp_body['mass']
+            total_x_weighted += temp_pos[0]*temp_mass
+            total_y_weighted += temp_pos[1]*temp_mass
+            total_mass += temp_mass
+
+        self.center_of_gravity = (total_x_weighted / total_mass, total_y_weighted / total_mass)
 
     # LUCAS: Higher tier operations will go here eventually too. These should follow the function definitions as defined
     #        in the abstract base solution class.
@@ -670,6 +684,7 @@ class WEC(AbstractBaseSolution):
             for n in range(0, rule_length):
                 if len(self.bodies) > 1:
                     temp_pto = (next_delete[1], next_delete[2])
+                    print(temp_pto)
                     if temp_pto[1] is 'rotational':
                         temp_pto = self.rotary_ptos_data[temp_pto[0]]
                         if temp_pto['idxa'] == next_delete[0]:
@@ -707,17 +722,227 @@ class WEC(AbstractBaseSolution):
     def increase_symmetry(self):
         # TODO: Create method to locate center of gravity of system
         # Then try to branch out and increase symmetry from there
-        pass
+        self.locate_center_of_gravity()
 
     def replicate_pattern(self):
         # TODO: Place pattern at one of the ends of the system
+        # 1. Choose length of pattern
+        # 2. Choose number of patterns
+        # 3. Choose initial body
+        # 4. Copy body data
+        # 5. If attached bodies are already in pattern, move to different body.
+        #    If none left, jump ahead. Else copy next body data and location to last
+        # 6. Choose to attach to left or right side of system
+        # 7. Identify body furthest to attachment side
+        # 8. Calculate shift in original position of patterned body to correctly position
+        # 9. Set new positions for all bodies in pattern to shifted values and add bodies to world
+        # 10. Add ptos to connect bodies in same orientation they previously were
+        # 11. Replicate pattern for number of patterns on same side of system
+
+        # Defined set maximum values for pattern
         max_bodies_in_pattern = 4
         max_num_patterns = 3
+
+        # Select bodies in pattern and number of patterns
         bodies_in_pattern = random.randint(1, min(max_bodies_in_pattern, len(self.bodies)))
         num_patterns = random.randint(1, max_num_patterns)
 
-        starting_body = random.randint(0, len(self.bodies)-1)
+        print("bodies in pattern: ", bodies_in_pattern)
 
+        # Select which body to begin pattern
+        starting_body_index = random.randint(0, len(self.bodies)-1)
+        starting_body = self.bodies[starting_body_index]
+        starting_body_position = starting_body['body'].position
+
+        # Add starting body to list of bodies in pattern
+        pattern_bodies = []
+        pattern_ptos = []
+        pattern_bodies.append({"body": starting_body,
+                               "original_body_index": starting_body_index,
+                               "original_position": starting_body_position})
+
+        print("starting pos: ", pattern_bodies[0]['original_position'])
+
+        # Create pattern
+        if bodies_in_pattern > 1:
+            for i in range(1, bodies_in_pattern):
+                # Check to see if pattern already has all bodies in system
+                if len(pattern_bodies) < len(self.bodies):
+                    # Initialize list and variable for next body to add to pattern
+                    possible_next_bodies = []
+                    body_to_add = None
+                    # Select which body in pattern will have a branch body added
+                    branch_point_index = random.randint(0, len(pattern_bodies)-1)
+                    branch_point = pattern_bodies[branch_point_index]
+
+                    for body_index in range(len(self.bodies)):
+                        body_found = False
+                        if len(self.rotary_ptos) > 0:
+                            for pto_index in range(0, len(self.rotary_ptos)):
+                                temp_pto = self.rotary_ptos_data[pto_index]
+                                if (temp_pto['idxa'] == branch_point['original_body_index']) \
+                                        and (temp_pto['idxb'] == body_index):
+                                    body_found = True
+                                elif (temp_pto['idxb'] == branch_point['original_body_index']) \
+                                        and (temp_pto['idxa'] == body_index):
+                                    body_found = True
+                                if body_found:
+                                    possible_next_bodies.append((body_index, pto_index, "rotational"))
+                                    break
+                        if len(self.linear_ptos) > 0 and not body_found:
+                            for pto_index in range(0, len(self.linear_ptos)):
+                                temp_pto = self.linear_ptos_data[pto_index]
+                                if (temp_pto['idxa'] == branch_point['original_body_index']) \
+                                        and (temp_pto['idxb'] == body_index):
+                                    body_found = True
+                                elif (temp_pto['idxb'] == branch_point['original_body_index']) \
+                                        and (temp_pto['idxa'] == body_index):
+                                    body_found = True
+                                if body_found:
+                                    possible_next_bodies.append((body_index, pto_index, "linear"))
+                                    break
+
+                    # Select body from list of possible bodies to add to pattern
+                    while len(possible_next_bodies) > 0:
+                        is_in_pattern = False
+                        i = random.randint(0, len(possible_next_bodies)-1)
+                        check_body = possible_next_bodies[i]
+                        check_body_original_index = check_body[0]
+                        # Check to see if body is already in pattern
+                        for j in range(0, len(pattern_bodies)):
+                            if pattern_bodies[j]['original_body_index'] == check_body_original_index:
+                                is_in_pattern = True
+                                break
+                        if not is_in_pattern:
+                            body_to_add = check_body
+                            break
+                        else:
+                            del possible_next_bodies[i]
+
+                    if body_to_add is not None:
+                        original_body_index = body_to_add[0]
+                        original_pto_index = body_to_add[1]
+                        pto_type = body_to_add[2]
+
+                        original_body = self.bodies[original_body_index]
+                        original_position = original_body['body'].position
+
+                        if pto_type is 'rotational':
+                            original_pto = self.rotary_ptos_data[original_pto_index]
+                        elif pto_type is 'linear':
+                            original_pto = self.linear_ptos_data[original_pto_index]
+
+                        pattern_bodies.append({"body": original_body,
+                                               "original_body_index": original_body_index,
+                                               "original_position": original_position})
+                        pattern_ptos.append({"pto": original_pto,
+                                             "pto_type": pto_type})
+
+        # Select which side of system to attach pattern
+        attachment_side = random.randint(0, 1)
+        if attachment_side == 0:
+            attachment_side = 'left'
+        elif attachment_side == 1:
+            attachment_side = 'right'
+
+        for current_pattern_iteration in range(0, num_patterns):
+            # Find which body in system is farthest on attachment side
+            attachment_body_index = 0
+            for check_body_index in range(0, len(self.bodies)):
+                check_body = self.bodies[check_body_index]
+                check_body_pos = check_body['body'].position
+                attachment_body = self.bodies[attachment_body_index]
+                attachment_body_pos = attachment_body['body'].position
+                if attachment_side is 'left':
+                    if (check_body_pos[0] < attachment_body_pos[0]) or \
+                            (check_body_pos[0] == attachment_body_pos[0] and check_body_pos[1] < attachment_body_pos[1]):
+                        attachment_body_index = check_body_index
+                elif attachment_side is 'right':
+                    if (check_body_pos[0] > attachment_body_pos[0]) or \
+                            (check_body_pos[0] == attachment_body_pos[0] and check_body_pos[1] < attachment_body_pos[1]):
+                        attachment_body_index = check_body_index
+
+            print("Attachment side: ", attachment_side)
+            print("Attachment body: ", attachment_body_index)
+
+            # Locate pattern body at side of pattern closest to attachment side
+            # (i.e. right-most body if attachment is on left, and vice-versa)
+            starting_pattern_body_index = 0
+            for check_pattern_body_index in range(0, len(pattern_bodies)):
+                check_pattern_body = pattern_bodies[check_pattern_body_index]
+                check_pattern_body_pos = check_pattern_body['original_position']
+                starting_body = pattern_bodies[starting_pattern_body_index]
+                starting_body_pos = starting_body['original_position']
+                if attachment_side is 'left':
+                    if (check_pattern_body_pos[0] > starting_body_pos[0]) or \
+                            (check_body_pos[0] == starting_body_pos[0] and check_body_pos[1] < starting_body_pos[1]):
+                        starting_pattern_body_index = check_pattern_body_index
+                elif attachment_side is 'right':
+                    if (check_pattern_body_pos[0] < starting_body_pos[0]) or \
+                            (check_body_pos[0] == starting_body_pos[0] and check_body_pos[1] < starting_body_pos[1]):
+                        starting_pattern_body_index = check_pattern_body_index
+
+            #
+            starting_body = pattern_bodies[starting_pattern_body_index]
+            starting_body_pos = starting_body['original_position']
+            starting_body_rad = starting_body['body']['radius']
+            attachment_body = self.bodies[attachment_body_index]
+            attachment_body_pos = attachment_body['body'].position
+            attachment_body_rad = attachment_body['radius']
+
+            if attachment_side is 'left':
+                side_shift = -(starting_body_rad + attachment_body_rad + self.pto_size)
+            elif attachment_side is 'right':
+                side_shift = (starting_body_rad + attachment_body_rad + self.pto_size)
+
+            x_shift = attachment_body_pos[0] - starting_body_pos[0] + side_shift
+            y_shift = attachment_body_pos[1] - starting_body_pos[1]
+
+            print(x_shift)
+
+            for index in range(0, len(pattern_bodies)):
+                temp_body = pattern_bodies[index]
+                temp_body_data = temp_body['body']
+                original_position = temp_body['original_position']
+                shape = 'sphere'
+                radius = temp_body_data['radius']
+                density = temp_body_data['density']
+                self.add_body(shape, density, (original_position[0] + x_shift, original_position[1] + y_shift),
+                              radius=radius)
+
+            self.add_rotational_pto(attachment_body_index,
+                                    len(self.bodies)-len(pattern_bodies)+starting_pattern_body_index, 0, 10000, 1000000)
+            if len(pattern_ptos) > 0:
+                for index in range(0, len(pattern_ptos)):
+                    temp_pto = pattern_ptos[index]
+                    temp_pto_data = temp_pto['pto']
+                    temp_pto_type = temp_pto['pto_type']
+
+                    idxa = temp_pto_data['idxa']
+                    idxb = temp_pto_data['idxb']
+
+                    for j in range(0, len(pattern_bodies)):
+                        if pattern_bodies[j]['original_body_index'] == idxa:
+                            idxa = len(self.bodies) - len(pattern_bodies) + j
+                        elif pattern_bodies[j]['original_body_index'] == idxb:
+                            idxb = len(self.bodies) - len(pattern_bodies) + j
+
+                    stiffness = temp_pto_data['stiffness']
+                    damping = temp_pto_data['damping']
+
+                    if temp_pto_type is 'rotational':
+                        rest_angle = 0
+                        self.add_rotational_pto(idxa, idxb, rest_angle, stiffness, damping)
+                    elif temp_pto_type is 'linear':
+                        pos_a = self.bodies[idxa]["body"].position
+                        pos_b = self.bodies[idxb]["body"].position
+                        resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2) + self.pto_size
+                        self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
+
+
+            print("Starting pattern body: ", starting_pattern_body_index)
+            for body in pattern_bodies:
+                print("Original position: ", body['original_position'])
 
     # End of higher-tier operations
 
@@ -852,7 +1077,7 @@ class WEC(AbstractBaseSolution):
             self.iter += 1
 
             if self.display_visual:
-                time.sleep(.01)
+                time.sleep(.001)
 
         self.iter = 0
 
@@ -873,31 +1098,30 @@ class WEC(AbstractBaseSolution):
         asdf = 1
 
     def rule_select(self):
-        num_rules = 12
+        num_rules = 8
         rule = random.randint(1, num_rules)
         print(rule)
         return rule
 
     def rule_perform(self, rule, **kwargs):
-        # TODO: Use WEC Sim to establish min and max parameter values
-        # TODO: Create default values for kwargs
+        # TODO: Put radius values back to 0 to 5
         y_min = 50
         y_max = self.sea_level
         x_min = 0
         x_max = 800
         radius_min = 10
-        radius_max = 25
+        radius_max = 50
         length_min = 1
         length_max = 100
         angle_min = 0
         angle_max = 90
         density_min = 500
-        density_max = 1200
+        density_max = 1300
         rest_angle = 0
-        stiffness_min = 100
-        stiffness_max = 10000
-        damping_min = 1000000
-        damping_max = 100000000
+        stiffness_min = 1
+        stiffness_max = 25000
+        damping_min = 1
+        damping_max = 2500000
         mooring_depth = 50
 
         valid_rule = False
@@ -909,12 +1133,31 @@ class WEC(AbstractBaseSolution):
                 shape = 'sphere'
             else:
                 shape = 'cylinder'
-            density = random.randint(density_min, density_max)
-            radius = random.randint(radius_min, radius_max)
-            length = random.randint(length_min, length_max)
-            angle = random.randint(angle_min, angle_max)
-            stiffness = random.randint(stiffness_min, stiffness_max)
-            damping = random.randint(damping_min, damping_max)
+
+            if kwargs.get('density') is not None:
+                density = kwargs['density']
+            else:
+                density = random.randint(density_min, density_max)
+            if kwargs.get('radius') is not None:
+                radius = kwargs['radius']
+            else:
+                radius = random.randint(radius_min, radius_max)
+            if kwargs.get('length') is not None:
+                length = kwargs['length']
+            else:
+                length = random.randint(length_min, length_max)
+            if kwargs.get('angle') is not None:
+                angle = kwargs['angle']
+            else:
+                angle = random.randint(angle_min, angle_max)
+            if kwargs.get('stiffness') is not None:
+                stiffness = kwargs['stiffness']
+            else:
+                stiffness = random.randint(stiffness_min, stiffness_max)
+            if kwargs.get('damping') is not None:
+                damping = kwargs['damping']
+            else:
+                damping = random.randint(damping_min, damping_max)
 
             self.rule_check()
             if kwargs.get('location') is not None:
@@ -947,12 +1190,31 @@ class WEC(AbstractBaseSolution):
                 shape = 'sphere'
             else:
                 shape = 'cylinder'
-            density = random.randint(density_min, density_max)
-            radius = random.randint(radius_min, radius_max)
-            length = random.randint(length_min, length_max)
-            angle = random.randint(angle_min, angle_max)
-            stiffness = random.randint(stiffness_min, stiffness_max)
-            damping = random.randint(damping_min, damping_max)
+
+            if kwargs.get('density') is not None:
+                density = kwargs['density']
+            else:
+                density = random.randint(density_min, density_max)
+            if kwargs.get('radius') is not None:
+                radius = kwargs['radius']
+            else:
+                radius = random.randint(radius_min, radius_max)
+            if kwargs.get('length') is not None:
+                length = kwargs['length']
+            else:
+                length = random.randint(length_min, length_max)
+            if kwargs.get('angle') is not None:
+                angle = kwargs['angle']
+            else:
+                angle = random.randint(angle_min, angle_max)
+            if kwargs.get('stiffness') is not None:
+                stiffness = kwargs['stiffness']
+            else:
+                stiffness = random.randint(stiffness_min, stiffness_max)
+            if kwargs.get('damping') is not None:
+                damping = kwargs['damping']
+            else:
+                damping = random.randint(damping_min, damping_max)
 
             self.rule_check()
             if kwargs.get('location') is not None:
@@ -981,10 +1243,10 @@ class WEC(AbstractBaseSolution):
         # Delete body with joint
         elif rule == 3:
             if len(self.bodies) > 1:
+                self.rule_check()
                 if kwargs.get('removal') is not None:
                     removal = kwargs['removal']
                 else:
-                    self.rule_check()
                     removal = self.deletable_bodies[random.randint(0, len(self.deletable_bodies)-1)]
                 self.remove_body_with_joint(removal[0], removal[1], removal[2])
 
@@ -1005,28 +1267,54 @@ class WEC(AbstractBaseSolution):
         # Change body dimensions
         elif rule == 5:
             if len(self.bodies) > 0:
-                body = random.randint(0, len(self.bodies)-1)
-                radius = random.randint(radius_min, radius_max)
-                length = random.randint(length_min, length_max)
-                angle = random.randint(angle_min, angle_max)
+                if kwargs.get('body') is not None:
+                    body = kwargs['body']
+                else:
+                    body = random.randint(0, len(self.bodies)-1)
+                if kwargs.get('radius') is not None:
+                    radius = kwargs['radius']
+                else:
+                    radius = random.randint(radius_min, radius_max)
+                if kwargs.get('length') is not None:
+                    length = kwargs['length']
+                else:
+                    length = random.randint(length_min, length_max)
+                if kwargs.get('angle') is not None:
+                    angle = kwargs['angle']
+                else:
+                    angle = random.randint(angle_min, angle_max)
                 self.change_body_dimensions(body, radius=radius, length=length, angle=angle)
 
         # Change body density
         elif rule == 6:
-            body = random.randint(0, len(self.bodies)-1)
-            density = random.randint(density_min, density_max)
-            self.change_body_density(body, density)
+            if len(self.bodies) > 0:
+                if kwargs.get('body') is not None:
+                    body = kwargs['body']
+                else:
+                    body = random.randint(0, len(self.bodies)-1)
+                if kwargs.get('density') is not None:
+                    density = kwargs['density']
+                else:
+                    density = random.randint(density_min, density_max)
+                self.change_body_density(body, density)
 
         # Relocate body with joint
         elif rule == 7:
             if len(self.bodies) > 1:
                 self.rule_check()
-                removal = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
-                while True:
-                    location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
+                if kwargs.get('removal') is not None:
+                    removal = kwargs['removal']
+                else:
+                    removal = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
+                if kwargs.get('location') is not None:
+                    location = kwargs['location']
                     attachment_body = location[0]
-                    if attachment_body != removal[0]:
-                        break
+                else:
+                    while True:
+                        location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
+                        attachment_body = location[0]
+                        if attachment_body != removal[0]:
+                            break
 
                 attachment_body_pos = self.bodies[attachment_body]['body'].position
                 attachment_body_radius = self.bodies[attachment_body]['radius']
@@ -1048,11 +1336,17 @@ class WEC(AbstractBaseSolution):
         # Swap bodies
         elif rule == 8:
             if len(self.bodies) > 1:
-                body_a = random.randint(0, len(self.bodies)-1)
-                while True:
-                    body_b = random.randint(0, len(self.bodies)-1)
-                    if body_a != body_b:
-                        break
+                if kwargs.get('body_a') is not None:
+                    body_a = kwargs['body_a']
+                else:
+                    body_a = random.randint(0, len(self.bodies)-1)
+                if kwargs.get('body_b') is not None:
+                    body_b = kwargs['body_b']
+                else:
+                    while True:
+                        body_b = random.randint(0, len(self.bodies)-1)
+                        if body_a != body_b:
+                            break
                 self.swap_bodies(body_a, body_b)
 
         # Add mooring system
