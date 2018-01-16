@@ -13,6 +13,10 @@ import time
 
 
 class WEC(AbstractBaseSolution):
+    # TODO: Lucas: Figure out problem where ptos_data goes out of range
+    # Instances of problem: in Standardize() pto_type
+    # TODO: Lucas: IMPORTANT! Rework how repositioning/valid positioning works, as this is key to fixing int vs float
+    # TODO: Lucas: Update integer to float values for body sizes in functions (esp. repositioning)
     # TODO: Update simulation to decrease instabilities
     simulation_dt = 0.1
     simulation_steps = 1000
@@ -529,6 +533,66 @@ class WEC(AbstractBaseSolution):
         self.mooring_reinstancing(idxa)
         self.mooring_reinstancing(idxb)
 
+    def change_joint_coefficients(self, index, joint_type, **kwargs):
+        # Extract current information for PTO
+        if joint_type is 'rotational':
+            temp_joint = self.rotary_ptos_data[index]
+            rest_angle = temp_joint['rest_angle']
+        elif joint_type is 'linear':
+            temp_joint = self.linear_ptos_data[index]
+            resting_length = temp_joint['resting_length']
+
+        idxa = temp_joint['idxa']
+        idxb = temp_joint['idxb']
+        if kwargs.get('stiffness') is not None:
+            stiffness = kwargs['stiffness']
+        else:
+            stiffness = temp_joint['stiffness']
+        if kwargs.get('damping') is not None:
+            damping = kwargs['damping']
+        else:
+            damping = temp_joint['damping']
+
+        print('joint index: ', index)
+        print('joint type: ', joint_type)
+        print('idxa: ', idxa)
+        print('idxb: ', idxb)
+        print('stiffness: ', temp_joint['stiffness'])
+        print('damping: ', temp_joint['damping'])
+        print(' ')
+
+        # Remove original joint
+        self.remove_joint(index, joint_type)
+
+        # Add new joint and reposition within lists to return to original index
+        if joint_type is 'rotational':
+            self.add_rotational_pto(idxa, idxb, rest_angle, stiffness, damping)
+            temp_joint = self.rotary_ptos[-1]
+            temp_joint_data = self.rotary_ptos_data[-1]
+            temp_pivot = self.pivot_joints[-1]
+            self.rotary_ptos.insert(index, temp_joint)
+            self.rotary_ptos_data.insert(index, temp_joint_data)
+            self.pivot_joints.insert(index, temp_pivot)
+            del self.rotary_ptos[-1]
+            del self.rotary_ptos_data[-1]
+            del self.pivot_joints[-1]
+            print(self.rotary_ptos_data[index])
+        elif joint_type is 'linear':
+            self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
+            temp_joint = self.linear_ptos[-1]
+            temp_joint_data = self.linear_ptos_data[-1]
+            temp_groove_a = self.groove_joints[-2]
+            temp_groove_b = self.groove_joints[-1]
+            self.linear_ptos.insert(index, temp_joint)
+            self.linear_ptos_data.insert(index, temp_joint_data)
+            self.groove_joints.insert(index * 2, temp_groove_a)
+            self.groove_joints.insert(index * 2 + 1, temp_groove_b)
+            del self.linear_ptos[-1]
+            del self.linear_ptos_data[-1]
+            del self.groove_joints[-1]
+            del self.groove_joints[-1]
+            print(self.linear_ptos_data[index])
+
     def add_mooring_system(self, position, body_index, stiffness, damping):
         radius = 20
 
@@ -624,17 +688,37 @@ class WEC(AbstractBaseSolution):
     # LUCAS: Higher tier operations will go here eventually too. These should follow the function definitions as defined
     #        in the abstract base solution class.
 
-    def create_initial_design(self, num_rules):
+    def create_initial_design(self, **kwargs):
+        # Select number of low-tier rules to apply to generate initial design
+        min_num_rules = 1
+        max_num_rules = 30
+        if kwargs.get('num_rules') is not None:
+            num_rules = kwargs['num_rules']
+        else:
+            num_rules = random.randint(min_num_rules, max_num_rules)
+
+        # Randomly select low-tier rules to apply to generate design
         for i in range(1, num_rules):
             rule = self.rule_select()
             self.rule_perform(rule)
             print('Validity: ', self.is_valid())
 
-    def change_design_scale(self):
+    def change_design_scale(self, **kwargs):
+       # Determine scale multiplier to be applied to size of design
         min_multiplier = 0.5
         max_multiplier = 2.0
 
+        # Check to see if input multiplier value will result in a size that is not feasible due to small size
         valid_multiplier = False
+        if kwargs.get('multiplier') is not None:
+            multiplier = kwargs['multiplier']
+            for index in range(0, len(self.bodies)):
+                if int(self.bodies[index]['radius'] * multiplier) < 1:
+                    valid_multiplier = False
+                    break
+                else:
+                    valid_multiplier = True
+
         while not valid_multiplier:
             multiplier = random.uniform(min_multiplier, max_multiplier)
             for index in range(0, len(self.bodies)):
@@ -644,6 +728,8 @@ class WEC(AbstractBaseSolution):
                 else:
                     valid_multiplier = True
 
+        print(multiplier)
+
         for index in range(0, len(self.bodies)):
             body = self.bodies[index]
             radius = int(body['radius'] * multiplier)
@@ -651,23 +737,59 @@ class WEC(AbstractBaseSolution):
             angle_offset = int(body['angle_offset'] * multiplier)
             self.change_body_dimensions(index, radius=radius, length=length, angle_offset=angle_offset)
 
-    def increase_or_decrease_complexity(self):
-        # TODO: Add selection to branch out in x, y, or both directions
+    def increase_or_decrease_complexity(self, **kwargs):
+        # Determine if device will become more complex or less complex
         increase = False
         decrease = False
-        decision = random.randint(0, 1)
-        if decision == 0:
-            increase = True
+        # Check kwargs to see if specific input was given
+        if kwargs.get('complexity_change_type') is not None:
+            decision = kwargs['complexity_change_type']
+            if decision is 'increase':
+                increase = True
+            elif decision is 'decrease':
+                decrease = True
         else:
-            decrease = True
+            type_selection = random.randint(0, 1)
+            if type_selection == 0:
+                increase = True
+            elif type_selection == 1:
+                decrease = True
 
+        # Determine length of rule
         min_length = 1
         max_length = 3
-        rule_length = random.randint(min_length, max_length)
+        # Check kwargs to see if specific input was given
+        if kwargs.get('rule_length') is not None:
+            rule_length = kwargs['rule_length']
+        else:
+            rule_length = random.randint(min_length, max_length)
+
+        # Select direction to expand
+        # Check kwargs to see if specific input was given
+        if kwargs.get('branch_direction') is not None:
+            branch_direction = kwargs['branch_direction']
+        else:
+            branch_direction_select = random.randint(0, 2)
+            if branch_direction_select == 0:
+                branch_direction = 'both'
+            elif branch_direction_select == 1:
+                branch_direction = 'x'
+            elif branch_direction_select == 2:
+                branch_direction = 'y'
+
+        # Specify which positions relative to a body are allowed for expansion, given branch direction
+        if branch_direction is 'both':
+            valid_locations = [0, 1, 2, 3]
+        elif branch_direction is 'x':
+            valid_locations = [0, 2]
+        elif branch_direction is 'y':
+            valid_locations = [1, 3]
 
         self.rule_check()
         if increase:
-            next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
+            next_location = (-1, -1)
+            while next_location[1] not in valid_locations:
+                next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
             for n in range(0, rule_length):
                 body_type = random.randint(0, 1)
                 if body_type == 0:
@@ -676,15 +798,15 @@ class WEC(AbstractBaseSolution):
                     self.rule_perform(2, location=next_location)
                 self.rule_check()
                 added_body_index = len(self.bodies) - 1
-                while next_location[0] is not added_body_index:
+                while next_location[0] is not added_body_index or (next_location[0] is added_body_index and next_location[1] not in valid_locations):
                     next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
 
         elif decrease and len(self.deletable_bodies) > 0:
             next_delete = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
             for n in range(0, rule_length):
+                print(self.deletable_bodies)
                 if len(self.bodies) > 1:
                     temp_pto = (next_delete[1], next_delete[2])
-                    print(temp_pto)
                     if temp_pto[1] is 'rotational':
                         temp_pto = self.rotary_ptos_data[temp_pto[0]]
                         if temp_pto['idxa'] == next_delete[0]:
@@ -704,6 +826,7 @@ class WEC(AbstractBaseSolution):
                         temp_next_delete -= 1
 
                     if len(self.bodies) > 1:
+                        self.rule_check()
                         for body in self.deletable_bodies:
                             if body[0] == temp_next_delete:
                                 continue_rule = True
@@ -720,12 +843,10 @@ class WEC(AbstractBaseSolution):
                         break
 
     def increase_symmetry(self):
-        # TODO: Create method to locate center of gravity of system
-        # Then try to branch out and increase symmetry from there
+        # TODO: Try to branch out and increase symmetry from center of gravity
         self.locate_center_of_gravity()
 
-    def replicate_pattern(self):
-        # TODO: Place pattern at one of the ends of the system
+    def replicate_pattern(self, **kwargs):
         # 1. Choose length of pattern
         # 2. Choose number of patterns
         # 3. Choose initial body
@@ -744,13 +865,24 @@ class WEC(AbstractBaseSolution):
         max_num_patterns = 3
 
         # Select bodies in pattern and number of patterns
-        bodies_in_pattern = random.randint(1, min(max_bodies_in_pattern, len(self.bodies)))
-        num_patterns = random.randint(1, max_num_patterns)
+        # Check kwargs to see if specific input was given
+        if kwargs.get('bodies_in_pattern') is not None:
+            bodies_in_pattern = kwargs['bodies_in_pattern']
+        else:
+            bodies_in_pattern = random.randint(1, min(max_bodies_in_pattern, len(self.bodies)))
+        if kwargs.get('num_patterns') is not None:
+            num_patterns = kwargs['num_patterns']
+        else:
+            num_patterns = random.randint(1, max_num_patterns)
 
         print("bodies in pattern: ", bodies_in_pattern)
 
         # Select which body to begin pattern
-        starting_body_index = random.randint(0, len(self.bodies)-1)
+        # Check kwargs to see if specific input was given
+        if kwargs.get('starting_body_index') is not None:
+            starting_body_index = kwargs['starting_body_index']
+        else:
+            starting_body_index = random.randint(0, len(self.bodies)-1)
         starting_body = self.bodies[starting_body_index]
         starting_body_position = starting_body['body'].position
 
@@ -944,6 +1076,176 @@ class WEC(AbstractBaseSolution):
             for body in pattern_bodies:
                 print("Original position: ", body['original_position'])
 
+    def standardize(self, **kwargs):
+        standardize_bodies = False
+        standardize_ptos = False
+
+        # Check kwargs to see if specific input was given
+        if kwargs.get('standardization_select') is not None:
+            standardization_select = kwargs['standardization_select']
+            if standardization_select is 'bodies' and len(self.bodies) > 1:
+                standardize_bodies = True
+            elif standardization_select is 'ptos' and (len(self.linear_ptos) + len(self.rotary_ptos) > 1):
+                standardize_ptos = True
+        else:
+            standardization_select = random.randint(0, 1)
+            if standardization_select == 0 and len(self.bodies) > 1:
+                standardize_bodies = True
+            elif standardization_select == 1 and (len(self.linear_ptos) + len(self.rotary_ptos) > 1):
+                standardize_ptos = True
+
+        # Standardiztion rate is based on a percentage
+        min_standard = 25
+        max_standard = 100
+
+        # Check kwargs to see if specific input was given
+        if kwargs.get('standardization_rate') is not None:
+            standardization_rate = kwargs['standardization_rate']
+        else:
+            standardization_rate = random.randint(min_standard, max_standard)/100
+
+        print('Standardization rate: ', standardization_rate)
+
+        if standardize_bodies:
+            # Possible options: density, dimensions
+            change_density = False
+            change_radius = False
+
+            # Check kwargs to see if specific input was given
+            if kwargs.get('base_index') is not None:
+                base_index = kwargs['base_index']
+            else:
+                base_index = random.randint(0, len(self.bodies)-1)
+            base = self.bodies[base_index]
+            base_density = base['density']
+            base_radius = base['radius']
+
+            # Check kwargs to see if specific input was given
+            if kwargs.get('num_to_standardize') is not None:
+                num_to_standardize = kwargs['num_to_standardize']
+            else:
+                num_to_standardize = random.randint(1, len(self.bodies)-1)
+            bodies_to_standardize = []
+            for num in range(0, num_to_standardize):
+                while True:
+                    index = random.randint(0, len(self.bodies)-1)
+                    if index not in bodies_to_standardize and index != base_index:
+                        bodies_to_standardize.append(index)
+                        break
+            print("Base index: ", base_index)
+            print("Base radius: ", base_radius)
+            print("Base density: ", base_density)
+            print("Bodies to standardize: ", bodies_to_standardize)
+
+            for i in range(0, num_to_standardize):
+                body_index = bodies_to_standardize[i]
+                body = self.bodies[body_index]
+                body_density = body['density']
+                body_radius = body['radius']
+                body_length = body['length']
+                body_angle_offset = body['angle_offset']
+
+                density_diff = base_density - body_density
+                radius_diff = base_radius - body_radius
+
+                new_density = body_density + density_diff*standardization_rate
+                new_radius = int(body_radius + radius_diff*standardization_rate)
+
+                self.change_body_density(body_index, new_density)
+                self.change_body_dimensions(body_index,
+                                            radius=new_radius, length=body_length, angle_offset=body_angle_offset)
+                print("Body: ", body_index, ", old radius: ", body_radius, ", new radius: ", new_radius)
+                print("Body: ", body_index, ", old density: ", body_density, ", new density: ", new_density)
+        elif standardize_ptos:
+            # Possible values to change: type, stiffness, damping
+            while True:
+                # Check kwargs to see if specific input was given
+                if kwargs.get('type_selection') is not None:
+                    type_selection = kwargs['type_selection']
+                    if type_selection is 'rotational':
+                        type_selection = 0
+                    elif type_selection is 'linear:':
+                        type_selection = 1
+                else:
+                    type_selection = random.randint(0, 1)
+
+                if type_selection == 0 and len(self.rotary_ptos) > 0:
+                    base_type = 'rotational'
+                    base_index = random.randint(0, len(self.rotary_ptos)-1)
+                    base_pto = self.rotary_ptos_data[base_index]
+                    base_stiffness = base_pto['stiffness']
+                    base_damping = base_pto['damping']
+                    break
+                elif type_selection == 1 and len(self.linear_ptos) > 0:
+                    base_type = 'linear'
+                    base_index = random.randint(0, len(self.linear_ptos)-1)
+                    base_pto = self.linear_ptos_data[base_index]
+                    base_stiffness = base_pto['stiffness']
+                    base_damping = base_pto['damping']
+                    break
+
+            print('Type: ', base_type)
+            print('Base index: ', base_index)
+            print('Base pto: ', base_pto)
+            print('Base stiffness: ', base_stiffness)
+            print('Base damping: ', base_damping)
+
+            num_to_standardize = random.randint(1, len(self.linear_ptos)+len(self.rotary_ptos)-1)
+            ptos_to_standardize = []
+
+            print('number to standardize: ', num_to_standardize)
+            for num in range(0, num_to_standardize):
+                while True:
+                    pto_valid = False
+                    guess_type_selection = random.randint(0, 1)
+                    if guess_type_selection == 0 and len(self.rotary_ptos) > 0:
+                        guess_pto_index = random.randint(0, len(self.rotary_ptos)-1)
+                        guess_pto = ({'pto_index': guess_pto_index,
+                                      'pto_type': 'rotational'})
+                        pto_valid = True
+                    elif guess_type_selection == 1 and len(self.linear_ptos) > 0:
+                        guess_pto_index = random.randint(0, len(self.linear_ptos)-1)
+                        guess_pto = ({'pto_index': guess_pto_index,
+                                      'pto_type': 'linear'})
+                        pto_valid = True
+                    for saved_pto in ptos_to_standardize:
+                        if guess_pto['pto_type'] is not saved_pto['pto_type'] or \
+                                (guess_pto['pto_type'] is saved_pto['pto_type'] and
+                                    guess_pto['pto_index'] is not saved_pto['pto_index']):
+                            pto_valid = True
+                        else:
+                            pto_valid = False
+                            break
+                    if pto_valid:
+                        ptos_to_standardize.append(guess_pto)
+                        break
+            print('ptos to standardize: ', ptos_to_standardize)
+
+            for i in range(0, num_to_standardize):
+                pto_index = ptos_to_standardize[i]['pto_index']
+                pto_type = ptos_to_standardize[i]['pto_type']
+                if pto_type is 'rotational':
+                    pto = self.rotary_ptos_data[pto_index]
+                    pto_stiffness = pto['stiffness']
+                    pto_damping = pto['damping']
+                elif pto_type is 'linear':
+                    pto = self.linear_ptos_data[pto_index]
+                    pto_stiffness = pto['stiffness']
+                    pto_damping = pto['damping']
+
+                stiffness_diff = base_stiffness - pto_stiffness
+                damping_diff = base_damping - pto_damping
+
+                new_stiffness = pto_stiffness + stiffness_diff*standardization_rate
+                new_damping = pto_damping + damping_diff*standardization_rate
+
+                self.rule_perform(9, joint_index=pto_index, joint_type=pto_type,
+                                  stiffness=new_stiffness, damping=new_damping)
+
+                # Convert joint type if joint is not same as 'standard' joint
+                if base_type is not pto_type:
+                    self.change_joint_type(pto_index, pto_type)
+
     # End of higher-tier operations
 
     def add_buoyant_force(self):
@@ -1104,13 +1406,14 @@ class WEC(AbstractBaseSolution):
         return rule
 
     def rule_perform(self, rule, **kwargs):
-        # TODO: Put radius values back to 0 to 5
+        # TODO: Lucas: Put radius values back to 0 to 5
+        # TODO: Lucas: Allow non-integer values to be selected (currently int values to make visualization easier)
         y_min = 50
         y_max = self.sea_level
         x_min = 0
         x_max = 800
         radius_min = 10
-        radius_max = 50
+        radius_max = 30
         length_min = 1
         length_max = 100
         angle_min = 0
@@ -1349,8 +1652,39 @@ class WEC(AbstractBaseSolution):
                             break
                 self.swap_bodies(body_a, body_b)
 
-        # Add mooring system
+        # Change joint coefficients
         elif rule == 9:
+            if len(self.rotary_ptos) > 0 or len(self.linear_ptos) > 0:
+                if kwargs.get('joint_type') is not None:
+                    joint_type = kwargs['joint_type']
+                else:
+                    while not valid_rule:
+                        type_select = random.randint(0, 1)
+                        if type_select == 0 and len(self.rotary_ptos) > 0:
+                            joint_type = 'rotational'
+                            valid_rule = True
+                        elif type_select == 1 and len(self.linear_ptos) > 0:
+                            joint_type = 'linear'
+                            valid_rule = True
+                if kwargs.get('joint_index') is not None:
+                    joint_index = kwargs['joint_index']
+                else:
+                    if joint_type is 'rotational':
+                        joint_index = random.randint(0, len(self.rotary_ptos)-1)
+                    elif joint_type is 'linear':
+                        joint_index = random.randint(0, len(self.linear_ptos)-1)
+                if kwargs.get('stiffness') is not None:
+                    stiffness = kwargs['stiffness']
+                else:
+                    stiffness = random.randint(stiffness_min, stiffness_max)
+                if kwargs.get('damping') is not None:
+                    damping = kwargs['damping']
+                else:
+                    damping = random.randint(damping_min, damping_max)
+                self.change_joint_coefficients(joint_index, joint_type, stiffness=stiffness, damping=damping)
+
+        # Add mooring system
+        elif rule == 10:
             if len(self.bodies) > 0:
                 x = random.randint(x_min, x_max)
                 y = mooring_depth
@@ -1360,20 +1694,20 @@ class WEC(AbstractBaseSolution):
                 self.add_mooring_system((x, y), body, stiffness, damping)
 
         # Delete mooring system
-        elif rule == 10:
+        elif rule == 11:
             if len(self.mooring_attachment_points) > 0:
                 mooring = random.randint(0, len(self.mooring_attachment_points)-1)
                 self.remove_mooring_system(mooring)
 
         # Relocate cable attachment point
-        elif rule == 11:
+        elif rule == 12:
             if len(self.mooring_attachment_points) > 0:
                 mooring = random.randint(0, len(self.mooring_attachment_points)-1)
                 body = random.randint(0, len(self.bodies)-1)
                 self.relocate_mooring_cable_attachment(mooring, body)
 
         # Relocate fixed body
-        elif rule == 12:
+        elif rule == 13:
             # print("Attachment points: ", self.mooring_attachment_points)
             # print("Fixed bodies: ", self.fixed_bodies)
             # print("Cable bodies: ", self.cable_bodies)

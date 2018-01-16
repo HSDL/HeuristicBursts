@@ -12,6 +12,19 @@ def test_simulation_of_wec():
     display.display(device)
 
     device.add_body('sphere', 650.0, (400, 400), radius=20)
+    device.rule_perform(1, location=(0, 0))
+    device.rule_perform(2, location=(0, 2))
+    device.rule_perform(1, location=(1, 0))
+    device.rule_perform(2, location=(2, 2))
+
+    display.display(device)
+    time.sleep(2)
+    wait = True
+    while wait:
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    wait = False
     # device.add_body('sphere', 650.0, (449, 0), radius=25)
     # device.add_body('sphere', 650.0, (350, 0), radius=25)
 
@@ -19,8 +32,8 @@ def test_simulation_of_wec():
     # device.add_rotational_body('sphere', 650.0, (502, 400), 1, 0, 1000, 10000000, radius=25)
     # device.rule_perform(3, removal=(2, 1, 'rotational'))
 
-    device.rule_perform(1)
-    device.rule_perform(2)
+    device.increase_or_decrease_complexity(complexity_change_type='decrease',
+                                           rule_length=2)
     display.display(device)
     time.sleep(2)
     wait = True
@@ -30,23 +43,28 @@ def test_simulation_of_wec():
                 if event.key == pygame.K_RETURN:
                     wait = False
 
-    # device.create_initial_design(20)
-    # display.display(device)
-    # time.sleep(2)
-    # wait = True
-    # while wait:
-    #     for event in pygame.event.get():
-    #         if event.type == pygame.KEYDOWN:
-    #             if event.key == pygame.K_RETURN:
-    #                 wait = False
+    for i in range(0, 5):
+        device.change_design_scale(multiplier=0.25)
+        display.display(device)
+        for body in device.bodies:
+            print('size: ', body['radius'])
+        time.sleep(2)
+        wait = True
+        while wait:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN:
+                        wait = False
 
-    # num_ops = 5
+    num_ops = 5
     # for n in range(0, num_ops):
-    #     op_select = random.randint(0, 1)
+    #     op_select = random.randint(0, 2)
     #     if op_select == 0:
     #         device.increase_or_decrease_complexity()
     #     elif op_select == 1:
     #         device.change_design_scale()
+    #     elif op_select == 2:
+    #         device.replicate_pattern()
     #     display.display(device)
     #     time.sleep(2)
     #     wait = True
@@ -78,20 +96,20 @@ def test_simulation_of_wec():
     # display = wec.wec_visual.wec_visual()
     # display.display(device)
 
-    device.replicate_pattern()
-    display.display(device)
-    time.sleep(2)
-    wait = True
-    while wait:
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    wait = False
+    # device.replicate_pattern()
+    # display.display(device)
+    # time.sleep(2)
+    # wait = True
+    # while wait:
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.KEYDOWN:
+    #             if event.key == pygame.K_RETURN:
+    #                 wait = False
 
-    device.display_visual = True
+    # device.display_visual = True
     # device.locate_center_of_gravity()
 
-    device.evaluate()
+    # device.evaluate()
 
     # print(device.power)
 
