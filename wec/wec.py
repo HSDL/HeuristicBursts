@@ -8,18 +8,17 @@ import wec.excitation_forces as ef
 import pkg_resources
 import random
 
+import copy
+
 import wec.wec_visual
 import time
 
 
 class WEC(AbstractBaseSolution):
-    # TODO: Lucas: Figure out problem where ptos_data goes out of range
-    # Instances of problem: in Standardize() pto_type
-    # TODO: Lucas: IMPORTANT! Rework how repositioning/valid positioning works, as this is key to fixing int vs float
-    # TODO: Lucas: Update integer to float values for body sizes in functions (esp. repositioning)
+    # TODO: Make sure index is lowered if body deleted is lower than next to be checked
     # TODO: Update simulation to decrease instabilities
     simulation_dt = 0.1
-    simulation_steps = 1000
+    simulation_steps = 5000
     initial_steps = 10000
     error_bias = pow(1.0 - 0.1, 10.0)
     spectrum = sp.Spectrum('bretschneider', fp=0.5, Hm0=2)
@@ -29,7 +28,7 @@ class WEC(AbstractBaseSolution):
     rho_w = 1000
     gravity = -9.81
     number_of_metrics = 3
-    sea_level = 400
+    sea_level = 0
     pto_size = 1
 
     def __init__(self):
@@ -37,6 +36,7 @@ class WEC(AbstractBaseSolution):
         self.world = pm.Space()
         self.world.gravity = (0, -9.81)
         self.world.damping = 0.95
+        self.stable_system = True
 
         # Initialize center of gravity of system
         self.center_of_gravity = (0, 0)
@@ -64,9 +64,18 @@ class WEC(AbstractBaseSolution):
         self.cable_bodies = []
         self.mooring_attachment_points = []
 
-        # current iteration
+        # Current iteration
         self.iter = 0
         self.display_visual = False
+
+        # List of applied rules
+        self.applied_rules = []
+
+        # Initialize design
+        self.add_body('sphere', 650.0, (0, 0), radius=2)
+        self.lowtier_rule_perform(1)
+        self.lowtier_rule_perform(1)
+        self.lowtier_rule_perform(2)
 
     def add_body(self, body_shape, density, position, **kwargs):
         # Calculate properties of body
@@ -259,7 +268,8 @@ class WEC(AbstractBaseSolution):
             test_body_pos = test_body['body'].position
             test_body_radius = test_body['radius']
             distance = np.sqrt((old_pos[0] - test_body_pos[0]) ** 2 + (old_pos[1] - test_body_pos[1]) ** 2)
-            if distance == R1 + test_body_radius + self.pto_size:
+            if distance <= R1 + test_body_radius + self.pto_size + 0.05 and \
+                            distance >= R1 + test_body_radius + self.pto_size - 0.05:
                 if test_body_pos[1] == old_pos[1] and test_body_pos[0] > old_pos[0] and relative_position == 0:
                     bodies_to_check.append(i)
                     bodies_to_shift.append(i)
@@ -296,13 +306,13 @@ class WEC(AbstractBaseSolution):
             temp_body_pos = temp_body['body'].position
 
             if relative_position == 0:
-                temp_body_pos[0] += rad_diff
+                temp_body_pos[0] = temp_body_pos[0] + rad_diff
             elif relative_position == 1:
-                temp_body_pos[1] += rad_diff
+                temp_body_pos[1] = temp_body_pos[1] + rad_diff
             elif relative_position == 2:
-                temp_body_pos[0] -= rad_diff
+                temp_body_pos[0] = temp_body_pos[0] - rad_diff
             elif relative_position == 3:
-                temp_body_pos[1] -= rad_diff
+                temp_body_pos[1] = temp_body_pos[1] - rad_diff
 
             self.remove_body(temp_body_index)
             self.add_body(temp_body['body_shape'], temp_body['density'], temp_body_pos,
@@ -553,13 +563,13 @@ class WEC(AbstractBaseSolution):
         else:
             damping = temp_joint['damping']
 
-        print('joint index: ', index)
-        print('joint type: ', joint_type)
-        print('idxa: ', idxa)
-        print('idxb: ', idxb)
-        print('stiffness: ', temp_joint['stiffness'])
-        print('damping: ', temp_joint['damping'])
-        print(' ')
+        # print('joint index: ', index)
+        # print('joint type: ', joint_type)
+        # print('idxa: ', idxa)
+        # print('idxb: ', idxb)
+        # print('stiffness: ', temp_joint['stiffness'])
+        # print('damping: ', temp_joint['damping'])
+        # print(' ')
 
         # Remove original joint
         self.remove_joint(index, joint_type)
@@ -576,7 +586,7 @@ class WEC(AbstractBaseSolution):
             del self.rotary_ptos[-1]
             del self.rotary_ptos_data[-1]
             del self.pivot_joints[-1]
-            print(self.rotary_ptos_data[index])
+            # print(self.rotary_ptos_data[index])
         elif joint_type is 'linear':
             self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
             temp_joint = self.linear_ptos[-1]
@@ -591,7 +601,7 @@ class WEC(AbstractBaseSolution):
             del self.linear_ptos_data[-1]
             del self.groove_joints[-1]
             del self.groove_joints[-1]
-            print(self.linear_ptos_data[index])
+            # print(self.linear_ptos_data[index])
 
     def add_mooring_system(self, position, body_index, stiffness, damping):
         radius = 20
@@ -685,8 +695,7 @@ class WEC(AbstractBaseSolution):
 
         self.center_of_gravity = (total_x_weighted / total_mass, total_y_weighted / total_mass)
 
-    # LUCAS: Higher tier operations will go here eventually too. These should follow the function definitions as defined
-    #        in the abstract base solution class.
+    # Start of higher-tier functions operations
 
     def create_initial_design(self, **kwargs):
         # Select number of low-tier rules to apply to generate initial design
@@ -699,9 +708,10 @@ class WEC(AbstractBaseSolution):
 
         # Randomly select low-tier rules to apply to generate design
         for i in range(1, num_rules):
-            rule = self.rule_select()
-            self.rule_perform(rule)
+            rule = self.lowtier_rule_select()
+            self.lowtier_rule_perform(rule)
             print('Validity: ', self.is_valid())
+        self.applied_rules.append('H1')
 
     def change_design_scale(self, **kwargs):
        # Determine scale multiplier to be applied to size of design
@@ -713,26 +723,30 @@ class WEC(AbstractBaseSolution):
         if kwargs.get('multiplier') is not None:
             multiplier = kwargs['multiplier']
             for index in range(0, len(self.bodies)):
-                if int(self.bodies[index]['radius'] * multiplier) < 1:
+                potential_radius = round((self.bodies[index]['radius'] * multiplier), 1)
+                if potential_radius < 1.0 or potential_radius > 5.0:
                     valid_multiplier = False
                     break
                 else:
                     valid_multiplier = True
 
         while not valid_multiplier:
-            multiplier = random.uniform(min_multiplier, max_multiplier)
+            multiplier = round(random.uniform(min_multiplier, max_multiplier), 1)
             for index in range(0, len(self.bodies)):
-                if int(self.bodies[index]['radius'] * multiplier) < 1:
+                potential_radius = round((self.bodies[index]['radius'] * multiplier), 1)
+                if potential_radius < 1.0 or potential_radius > 5.0:
                     valid_multiplier = False
                     break
                 else:
                     valid_multiplier = True
 
-        print(multiplier)
+        self.applied_rules.append('H4')
+
+        # print(multiplier)
 
         for index in range(0, len(self.bodies)):
             body = self.bodies[index]
-            radius = int(body['radius'] * multiplier)
+            radius = round((body['radius'] * multiplier), 1)
             length = int(body['length'] * multiplier)
             angle_offset = int(body['angle_offset'] * multiplier)
             self.change_body_dimensions(index, radius=radius, length=length, angle_offset=angle_offset)
@@ -786,6 +800,7 @@ class WEC(AbstractBaseSolution):
             valid_locations = [1, 3]
 
         self.rule_check()
+
         if increase:
             next_location = (-1, -1)
             while next_location[1] not in valid_locations:
@@ -793,20 +808,29 @@ class WEC(AbstractBaseSolution):
             for n in range(0, rule_length):
                 body_type = random.randint(0, 1)
                 if body_type == 0:
-                    self.rule_perform(1, location=next_location)
+                    self.lowtier_rule_perform(1, location=next_location)
+                    # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
+                    del self.applied_rules[-1]
                 elif body_type == 1:
-                    self.rule_perform(2, location=next_location)
+                    self.lowtier_rule_perform(2, location=next_location)
+                    # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
+                    del self.applied_rules[-1]
                 self.rule_check()
                 added_body_index = len(self.bodies) - 1
                 while next_location[0] is not added_body_index or (next_location[0] is added_body_index and next_location[1] not in valid_locations):
                     next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
+            self.applied_rules.append('H2')
 
         elif decrease and len(self.deletable_bodies) > 0:
+            # Pick starting point for chain to delete from available deletable bodies
             next_delete = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
             for n in range(0, rule_length):
-                print(self.deletable_bodies)
+                # print(self.deletable_bodies)
                 if len(self.bodies) > 1:
                     temp_pto = (next_delete[1], next_delete[2])
+                    print('temp pto:,', temp_pto)
+                    print('length rot:', len(self.rotary_ptos), len(self.rotary_ptos_data))
+                    print('length lin:', len(self.linear_ptos), len(self.linear_ptos_data))
                     if temp_pto[1] is 'rotational':
                         temp_pto = self.rotary_ptos_data[temp_pto[0]]
                         if temp_pto['idxa'] == next_delete[0]:
@@ -820,8 +844,11 @@ class WEC(AbstractBaseSolution):
                         elif temp_pto['idxb'] == next_delete[0]:
                             temp_next_delete = temp_pto['idxa']
 
-                    self.rule_perform(3, removal=next_delete)
+                    self.lowtier_rule_perform(3, removal=next_delete)
+                    # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
+                    del self.applied_rules[-1]
 
+                    # Lower index of temp next delete if the deleted body had a lower index
                     if temp_next_delete > next_delete[0]:
                         temp_next_delete -= 1
 
@@ -841,6 +868,7 @@ class WEC(AbstractBaseSolution):
                             next_delete = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
                     else:
                         break
+            self.applied_rules.append('H3')
 
     def increase_symmetry(self):
         # TODO: Try to branch out and increase symmetry from center of gravity
@@ -875,7 +903,7 @@ class WEC(AbstractBaseSolution):
         else:
             num_patterns = random.randint(1, max_num_patterns)
 
-        print("bodies in pattern: ", bodies_in_pattern)
+        # print("bodies in pattern: ", bodies_in_pattern)
 
         # Select which body to begin pattern
         # Check kwargs to see if specific input was given
@@ -893,7 +921,7 @@ class WEC(AbstractBaseSolution):
                                "original_body_index": starting_body_index,
                                "original_position": starting_body_position})
 
-        print("starting pos: ", pattern_bodies[0]['original_position'])
+        # print("starting pos: ", pattern_bodies[0]['original_position'])
 
         # Create pattern
         if bodies_in_pattern > 1:
@@ -994,8 +1022,8 @@ class WEC(AbstractBaseSolution):
                             (check_body_pos[0] == attachment_body_pos[0] and check_body_pos[1] < attachment_body_pos[1]):
                         attachment_body_index = check_body_index
 
-            print("Attachment side: ", attachment_side)
-            print("Attachment body: ", attachment_body_index)
+            # print("Attachment side: ", attachment_side)
+            # print("Attachment body: ", attachment_body_index)
 
             # Locate pattern body at side of pattern closest to attachment side
             # (i.e. right-most body if attachment is on left, and vice-versa)
@@ -1030,7 +1058,7 @@ class WEC(AbstractBaseSolution):
             x_shift = attachment_body_pos[0] - starting_body_pos[0] + side_shift
             y_shift = attachment_body_pos[1] - starting_body_pos[1]
 
-            print(x_shift)
+            # print(x_shift)
 
             for index in range(0, len(pattern_bodies)):
                 temp_body = pattern_bodies[index]
@@ -1071,10 +1099,10 @@ class WEC(AbstractBaseSolution):
                         resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2) + self.pto_size
                         self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
 
-
-            print("Starting pattern body: ", starting_pattern_body_index)
-            for body in pattern_bodies:
-                print("Original position: ", body['original_position'])
+            # print("Starting pattern body: ", starting_pattern_body_index)
+            # for body in pattern_bodies:
+            #     print("Original position: ", body['original_position'])
+        self.applied_rules.append('H5')
 
     def standardize(self, **kwargs):
         standardize_bodies = False
@@ -1104,7 +1132,7 @@ class WEC(AbstractBaseSolution):
         else:
             standardization_rate = random.randint(min_standard, max_standard)/100
 
-        print('Standardization rate: ', standardization_rate)
+        # print('Standardization rate: ', standardization_rate)
 
         if standardize_bodies:
             # Possible options: density, dimensions
@@ -1132,10 +1160,10 @@ class WEC(AbstractBaseSolution):
                     if index not in bodies_to_standardize and index != base_index:
                         bodies_to_standardize.append(index)
                         break
-            print("Base index: ", base_index)
-            print("Base radius: ", base_radius)
-            print("Base density: ", base_density)
-            print("Bodies to standardize: ", bodies_to_standardize)
+            # print("Base index: ", base_index)
+            # print("Base radius: ", base_radius)
+            # print("Base density: ", base_density)
+            # print("Bodies to standardize: ", bodies_to_standardize)
 
             for i in range(0, num_to_standardize):
                 body_index = bodies_to_standardize[i]
@@ -1154,8 +1182,8 @@ class WEC(AbstractBaseSolution):
                 self.change_body_density(body_index, new_density)
                 self.change_body_dimensions(body_index,
                                             radius=new_radius, length=body_length, angle_offset=body_angle_offset)
-                print("Body: ", body_index, ", old radius: ", body_radius, ", new radius: ", new_radius)
-                print("Body: ", body_index, ", old density: ", body_density, ", new density: ", new_density)
+                # print("Body: ", body_index, ", old radius: ", body_radius, ", new radius: ", new_radius)
+                # print("Body: ", body_index, ", old density: ", body_density, ", new density: ", new_density)
         elif standardize_ptos:
             # Possible values to change: type, stiffness, damping
             while True:
@@ -1184,16 +1212,16 @@ class WEC(AbstractBaseSolution):
                     base_damping = base_pto['damping']
                     break
 
-            print('Type: ', base_type)
-            print('Base index: ', base_index)
-            print('Base pto: ', base_pto)
-            print('Base stiffness: ', base_stiffness)
-            print('Base damping: ', base_damping)
+            # print('Type: ', base_type)
+            # print('Base index: ', base_index)
+            # print('Base pto: ', base_pto)
+            # print('Base stiffness: ', base_stiffness)
+            # print('Base damping: ', base_damping)
 
             num_to_standardize = random.randint(1, len(self.linear_ptos)+len(self.rotary_ptos)-1)
             ptos_to_standardize = []
 
-            print('number to standardize: ', num_to_standardize)
+            # print('number to standardize: ', num_to_standardize)
             for num in range(0, num_to_standardize):
                 while True:
                     pto_valid = False
@@ -1219,7 +1247,7 @@ class WEC(AbstractBaseSolution):
                     if pto_valid:
                         ptos_to_standardize.append(guess_pto)
                         break
-            print('ptos to standardize: ', ptos_to_standardize)
+            # print('ptos to standardize: ', ptos_to_standardize)
 
             for i in range(0, num_to_standardize):
                 pto_index = ptos_to_standardize[i]['pto_index']
@@ -1228,6 +1256,7 @@ class WEC(AbstractBaseSolution):
                     pto = self.rotary_ptos_data[pto_index]
                     pto_stiffness = pto['stiffness']
                     pto_damping = pto['damping']
+
                 elif pto_type is 'linear':
                     pto = self.linear_ptos_data[pto_index]
                     pto_stiffness = pto['stiffness']
@@ -1239,12 +1268,21 @@ class WEC(AbstractBaseSolution):
                 new_stiffness = pto_stiffness + stiffness_diff*standardization_rate
                 new_damping = pto_damping + damping_diff*standardization_rate
 
-                self.rule_perform(9, joint_index=pto_index, joint_type=pto_type,
-                                  stiffness=new_stiffness, damping=new_damping)
+                self.lowtier_rule_perform(9, joint_index=pto_index, joint_type=pto_type,
+                                          stiffness=new_stiffness, damping=new_damping)
+                # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
+                del self.applied_rules[-1]
 
                 # Convert joint type if joint is not same as 'standard' joint
                 if base_type is not pto_type:
                     self.change_joint_type(pto_index, pto_type)
+
+                    # Check to see if conversion of pto type requires index of next standardized joints to be changed
+                    for check_index in range(i, num_to_standardize):
+                        check_pto = ptos_to_standardize[check_index]
+                        if check_pto['pto_type'] is pto_type and check_pto['pto_index'] > pto_index:
+                            ptos_to_standardize[check_index]['pto_index'] -= 1
+        self.applied_rules.append('H6')
 
     # End of higher-tier operations
 
@@ -1333,6 +1371,7 @@ class WEC(AbstractBaseSolution):
             self.bodies[i]['xyz'][self.iter, 1] = self.bodies[i]['body'].position[1]
 
     def evaluate(self):
+        self.stable_system = True
         energy = np.zeros(2)
         if self.display_visual:
             self.display = wec.wec_visual.wec_visual()
@@ -1363,6 +1402,11 @@ class WEC(AbstractBaseSolution):
                 body['last_velocity'] = body['body'].velocity
                 body['last_position'] = body['body'].position
                 # print(dv, dxy, body['last_position'], body['last_velocity'])
+                if np.linalg.norm(body['last_velocity']) > 50:
+                    self.stable_system = False
+                    print("ITERATION UNSTABLE")
+                    print('')
+                    break
 
             # Pull position data
             self.pull_position_data()
@@ -1376,6 +1420,9 @@ class WEC(AbstractBaseSolution):
                     relative_velocity = np.abs(pto.a.angular_velocity - pto.b.angular_velocity)
                     energy[1] += np.power(relative_velocity, 2) * pto.damping * self.simulation_dt
 
+            if not self.stable_system:
+                break
+
             self.iter += 1
 
             if self.display_visual:
@@ -1383,8 +1430,11 @@ class WEC(AbstractBaseSolution):
 
         self.iter = 0
 
-        # Calculate power
-        self.power = energy / (self.simulation_dt * self.simulation_steps)
+        # Calculate power and add together to final total power produced
+        self.power = sum(energy / (self.simulation_dt * self.simulation_steps))
+        # If power is zero, set power to arbitrarily small value so comparisons do not divide by zero in agent
+        if self.power == 0:
+            self.power = 1e-40
 
         # Calculate mass
         self.mass = 0
@@ -1396,24 +1446,29 @@ class WEC(AbstractBaseSolution):
 
         return [self.mass, -self.power, self.pieces]
 
-    def __deepcopy__(self):
-        asdf = 1
-
-    def rule_select(self):
-        num_rules = 8
+    # Low-tier random rule selection
+    def lowtier_rule_select(self):
+        num_rules = 9
         rule = random.randint(1, num_rules)
-        print(rule)
+        # print(rule)
         return rule
 
-    def rule_perform(self, rule, **kwargs):
-        # TODO: Lucas: Put radius values back to 0 to 5
-        # TODO: Lucas: Allow non-integer values to be selected (currently int values to make visualization easier)
+    # High-tier random rule selection
+    def hightier_rule_select(self):
+        # Not counting H1 (Generate initial design) as option for rule application
+        num_rules = 5
+        rule = random.randint(2, num_rules+1)
+        # print(rule)
+        return rule
+
+    # Perform low-tier rule. Can select randomized values or take specific inputs for each rule
+    def lowtier_rule_perform(self, rule, **kwargs):
         y_min = 50
         y_max = self.sea_level
-        x_min = 0
-        x_max = 800
-        radius_min = 10
-        radius_max = 30
+        x_min = -100
+        x_max = 100
+        radius_min = 1
+        radius_max = 5
         length_min = 1
         length_max = 100
         angle_min = 0
@@ -1444,7 +1499,7 @@ class WEC(AbstractBaseSolution):
             if kwargs.get('radius') is not None:
                 radius = kwargs['radius']
             else:
-                radius = random.randint(radius_min, radius_max)
+                radius = random.randint(radius_min*10, radius_max*10)/10
             if kwargs.get('length') is not None:
                 length = kwargs['length']
             else:
@@ -1485,6 +1540,7 @@ class WEC(AbstractBaseSolution):
 
             self.add_rotational_body(shape, density, (x, y), body, rest_angle, stiffness, damping,
                                      radius=radius, length=length, angle_offset=angle)
+            self.applied_rules.append('L1')
 
         # Add linear body
         elif rule == 2:
@@ -1501,7 +1557,7 @@ class WEC(AbstractBaseSolution):
             if kwargs.get('radius') is not None:
                 radius = kwargs['radius']
             else:
-                radius = random.randint(radius_min, radius_max)
+                radius = random.randint(radius_min*10, radius_max*10)/10
             if kwargs.get('length') is not None:
                 length = kwargs['length']
             else:
@@ -1542,6 +1598,7 @@ class WEC(AbstractBaseSolution):
 
             self.add_linear_body(shape, density, (x, y), body, stiffness, damping,
                                  radius=radius, length=length, angle_offset=angle)
+            self.applied_rules.append('L2')
 
         # Delete body with joint
         elif rule == 3:
@@ -1552,6 +1609,7 @@ class WEC(AbstractBaseSolution):
                 else:
                     removal = self.deletable_bodies[random.randint(0, len(self.deletable_bodies)-1)]
                 self.remove_body_with_joint(removal[0], removal[1], removal[2])
+                self.applied_rules.append('L3')
 
         # Change joint type
         elif rule == 4:
@@ -1566,6 +1624,7 @@ class WEC(AbstractBaseSolution):
                         pto = random.randint(0, len(self.linear_ptos)-1)
                         self.change_joint_type(pto, 'linear')
                         valid_rule = True
+                self.applied_rules.append('L4')
 
         # Change body dimensions
         elif rule == 5:
@@ -1587,6 +1646,7 @@ class WEC(AbstractBaseSolution):
                 else:
                     angle = random.randint(angle_min, angle_max)
                 self.change_body_dimensions(body, radius=radius, length=length, angle=angle)
+                self.applied_rules.append('L5')
 
         # Change body density
         elif rule == 6:
@@ -1600,6 +1660,7 @@ class WEC(AbstractBaseSolution):
                 else:
                     density = random.randint(density_min, density_max)
                 self.change_body_density(body, density)
+                self.applied_rules.append('L6')
 
         # Relocate body with joint
         elif rule == 7:
@@ -1635,6 +1696,7 @@ class WEC(AbstractBaseSolution):
                     x = attachment_body_pos[0]
                     y = attachment_body_pos[1] - attachment_body_radius - radius- self.pto_size
                 self.relocate_body_with_joint(removal[0], removal[1], removal[2], (x, y), attachment_body)
+                self.applied_rules.append('L7')
 
         # Swap bodies
         elif rule == 8:
@@ -1651,6 +1713,7 @@ class WEC(AbstractBaseSolution):
                         if body_a != body_b:
                             break
                 self.swap_bodies(body_a, body_b)
+                self.applied_rules.append('L8')
 
         # Change joint coefficients
         elif rule == 9:
@@ -1682,6 +1745,7 @@ class WEC(AbstractBaseSolution):
                 else:
                     damping = random.randint(damping_min, damping_max)
                 self.change_joint_coefficients(joint_index, joint_type, stiffness=stiffness, damping=damping)
+                self.applied_rules.append('L9')
 
         # Add mooring system
         elif rule == 10:
@@ -1717,6 +1781,28 @@ class WEC(AbstractBaseSolution):
                 mooring = random.randint(0, len(self.mooring_attachment_points)-1)
                 self.relocate_mooring_fixed_body(mooring, (x, y))
 
+    # Perform high-tier rule. Can select randomized values or take specific inputs for each rule
+    def hightier_rule_perform(self, rule, **kwargs):
+        # Create initial design
+        if rule == 1:
+            self.create_initial_design(**kwargs)
+        # Increase complexity
+        elif rule == 2:
+            self.increase_or_decrease_complexity(complexity_change_type='increase', **kwargs)
+        # Decrease complexity
+        elif rule == 3:
+            self.increase_or_decrease_complexity(complexity_change_type='decrease', **kwargs)
+        # Change design scale
+        elif rule == 4:
+            self.change_design_scale(**kwargs)
+        # Replicate pattern
+        elif rule == 5:
+            self.replicate_pattern(**kwargs)
+        # Standardize
+        elif rule == 6:
+            self.standardize(**kwargs)
+
+    # Check to see if any bodies are overlapping
     def is_valid(self):
         validity = True
         for body_a in self.world.shapes:
@@ -1731,6 +1817,7 @@ class WEC(AbstractBaseSolution):
                 break
         return validity
 
+    # Search through design to check where bodies can be added and where bodies can be deleted
     def rule_check(self):
         self.addition_locations = []
         self.deletable_bodies = []
@@ -1745,27 +1832,28 @@ class WEC(AbstractBaseSolution):
                     test_body_pos = test_body['body'].position
                     test_body_radius = test_body['radius']
                     distance = np.sqrt((body_pos[0]-test_body_pos[0])**2 + (body_pos[1]-test_body_pos[1])**2)
-                    if distance == body_radius + test_body_radius + self.pto_size:
+                    if distance <= body_radius + test_body_radius + self.pto_size + 0.05 and \
+                                    distance >= body_radius + test_body_radius + self.pto_size - 0.05:
                         if pos_to_check == 0:
-                            if test_body_pos[0] < body_pos[0] + distance:
+                            if test_body_pos[0] + 0.05 < body_pos[0] + distance:
                                 valid_location = True
                             else:
                                 valid_location = False
                                 break
                         elif pos_to_check == 1:
-                            if test_body_pos[1] < body_pos[1] + distance:
+                            if test_body_pos[1] + 0.05 < body_pos[1] + distance and body_pos[1] + body_radius < self.sea_level:
                                 valid_location = True
                             else:
                                 valid_location = False
                                 break
                         elif pos_to_check == 2:
-                            if test_body_pos[0] > body_pos[0] - distance:
+                            if test_body_pos[0] - 0.05 > body_pos[0] - distance:
                                 valid_location = True
                             else:
                                 valid_location = False
                                 break
                         elif pos_to_check == 3:
-                            if test_body_pos[1] > body_pos[1] - distance:
+                            if test_body_pos[1] - 0.05 > body_pos[1] - distance:
                                 valid_location = True
                             else:
                                 valid_location = False
@@ -1795,3 +1883,11 @@ class WEC(AbstractBaseSolution):
                 i += 1
             if connections == 1:
                 self.deletable_bodies.append((n, pto_index, type))
+
+    # Function needed to make copy of WEC object by agent
+    def __deepcopy__(self, memo):
+        deepcopy_method = self.__deepcopy__
+        self.__deepcopy__ = None
+        cp = copy.deepcopy(self, memo)
+        self.__deepcopy__ = deepcopy_method
+        return cp

@@ -5,8 +5,12 @@ import pymunk.pygame_util
 class wec_visual():
     # Colors
     white = (255, 255, 255)
+    grey = (100, 100, 100)
     black = (0, 0, 0)
     light_blue = (0, 128, 255)
+    red = (175, 0, 0)
+    green = (0, 175, 0)
+    orange = (255, 69, 0)
 
     # Screen Dimensions
     SCREEN_WIDTH = 1000
@@ -28,8 +32,58 @@ class wec_visual():
             pygame.draw.line(self.screen, self.black, (n*50, 0), (n*50, self.SCREEN_HEIGHT))
         for n in range(0, int(self.SCREEN_HEIGHT/50)+100):
             pygame.draw.line(self.screen, self.black, (0, n*50), (self.SCREEN_WIDTH, n*50))
-        # display_device = self.display_shift(device)
+        pygame.event.get()
         device.world.debug_draw(options)
+        for body in device.bodies:
+            radius = body['radius']
+            position = body['body'].position
+            position[0] = int(position[0]*10 + 400)
+            position[1] = -int(position[1]*10 - 400)
+            pygame.draw.circle(self.screen, self.black, position, int(radius * 10) + 1)
+            pygame.draw.circle(self.screen, self.grey, position, int(radius*10))
+        for rotational_pto in device.rotary_ptos_data:
+            idxa = rotational_pto['idxa']
+            idxb = rotational_pto['idxb']
+            pos_a = device.bodies[idxa]['body'].position
+            pos_a[0] = int(pos_a[0]*10 + 400)
+            pos_a[1] = -int(pos_a[1]*10 - 400)
+            pos_b = device.bodies[idxb]['body'].position
+            pos_b[0] = int(pos_b[0] * 10 + 400)
+            pos_b[1] = -int(pos_b[1] * 10 - 400)
+            pygame.draw.line(self.screen, self.green, pos_a, pos_b, 3)
+            pygame.draw.circle(self.screen, self.black, pos_a, 3)
+            pygame.draw.circle(self.screen, self.black, pos_b, 3)
+        for linear_pto in device.linear_ptos_data:
+            idxa = linear_pto['idxa']
+            idxb = linear_pto['idxb']
+            pos_a = device.bodies[idxa]['body'].position
+            pos_a[0] = int(pos_a[0] * 10 + 400)
+            pos_a[1] = -int(pos_a[1] * 10 - 400)
+            pos_b = device.bodies[idxb]['body'].position
+            pos_b[0] = int(pos_b[0] * 10 + 400)
+            pos_b[1] = -int(pos_b[1] * 10 - 400)
+            pygame.draw.line(self.screen, self.orange, pos_a, pos_b, 3)
+            pygame.draw.circle(self.screen, self.black, pos_a, 3)
+            pygame.draw.circle(self.screen, self.black, pos_b, 3)
+
+        pygame.draw.circle(self.screen, self.black, (100, 100), 52)
+        pygame.draw.circle(self.screen, self.red, (100, 100), 50)
+
+        pygame.display.update()
+
+    def wait_to_continue(self):
+        pygame.draw.circle(self.screen, self.black, (100, 100), 52)
+        pygame.draw.circle(self.screen, self.green, (100, 100), 50)
+        pygame.display.update()
+        wait = True
+        while wait:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN:
+                        wait = False
+        pygame.draw.circle(self.screen, self.black, (100, 100), 52)
+        pygame.draw.circle(self.screen, self.red, (100, 100), 50)
+
         pygame.display.update()
 
     def display_shift(self, device):
