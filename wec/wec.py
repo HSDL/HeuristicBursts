@@ -16,10 +16,9 @@ import time
 
 class WEC(AbstractBaseSolution):
     # TODO: Make sure index is lowered if body deleted is lower than next to be checked
-    # TODO: Update simulation to decrease instabilities
-    simulation_dt = 0.1
-    simulation_steps = 5000
-    initial_steps = 10000
+    simulation_dt = 0.01
+    simulation_steps = 3000
+    initial_steps = 7000
     error_bias = pow(1.0 - 0.1, 10.0)
     spectrum = sp.Spectrum('bretschneider', fp=0.5, Hm0=2)
     forces = ef.ExcitationForces()
@@ -73,9 +72,12 @@ class WEC(AbstractBaseSolution):
 
         # Initialize design
         self.add_body('sphere', 650.0, (0, 0), radius=2)
-        self.lowtier_rule_perform(1)
-        self.lowtier_rule_perform(1)
-        self.lowtier_rule_perform(2)
+        self.lowtier_rule_perform(1, location=(0, 0), radius=2, density=650.0, stiffness=1000, damping=1000000)
+        self.lowtier_rule_perform(1, location=(0, 2), radius=2, density=650.0, stiffness=1000, damping=1000000)
+        self.lowtier_rule_perform(2, location=(0, 3), radius=2, density=1000.0, stiffness=1000, damping=1000000)
+
+        self.applied_rules = []
+
 
     def add_body(self, body_shape, density, position, **kwargs):
         # Calculate properties of body
@@ -802,24 +804,45 @@ class WEC(AbstractBaseSolution):
         self.rule_check()
 
         if increase:
-            next_location = (-1, -1)
-            while next_location[1] not in valid_locations:
-                next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
-            for n in range(0, rule_length):
-                body_type = random.randint(0, 1)
-                if body_type == 0:
-                    self.lowtier_rule_perform(1, location=next_location)
-                    # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
-                    del self.applied_rules[-1]
-                elif body_type == 1:
-                    self.lowtier_rule_perform(2, location=next_location)
-                    # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
-                    del self.applied_rules[-1]
-                self.rule_check()
-                added_body_index = len(self.bodies) - 1
-                while next_location[0] is not added_body_index or (next_location[0] is added_body_index and next_location[1] not in valid_locations):
-                    next_location = self.addition_locations[random.randint(0, len(self.addition_locations) - 1)]
-            self.applied_rules.append('H2')
+            rule_possible = False
+            for check in self.addition_locations:
+                if check[1] in valid_locations:
+                    rule_possible = True
+                    break
+            if rule_possible:
+                left_to_check = copy.deepcopy(self.addition_locations)
+                next_location = (-1, -1)
+                while next_location[1] not in valid_locations and len(left_to_check) > 0:
+                    check_index = random.randint(0, len(left_to_check)-1)
+                    next_location = left_to_check[check_index]
+                    del left_to_check[check_index]
+
+                for n in range(0, rule_length):
+                    rule_possible = False
+                    for check in self.addition_locations:
+                        if check[1] in valid_locations and check[0] == next_location[0]:
+                            rule_possible = True
+                            break
+                    if rule_possible:
+                        body_type = random.randint(0, 1)
+                        if body_type == 0:
+                            self.lowtier_rule_perform(1, location=next_location)
+                            # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
+                            del self.applied_rules[-1]
+                        elif body_type == 1:
+                            self.lowtier_rule_perform(2, location=next_location)
+                            # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
+                            del self.applied_rules[-1]
+                        self.rule_check()
+                        left_to_check = copy.deepcopy(self.addition_locations)
+                        added_body_index = len(self.bodies) - 1
+                        while (next_location[0] != added_body_index or (next_location[0] == added_body_index and next_location[1] not in valid_locations)) and len(left_to_check) > 0:
+                            check_index = random.randint(0, len(left_to_check) - 1)
+                            next_location = left_to_check[check_index]
+                            del left_to_check[check_index]
+                    else:
+                        break
+                self.applied_rules.append('H2')
 
         elif decrease and len(self.deletable_bodies) > 0:
             # Pick starting point for chain to delete from available deletable bodies
@@ -863,6 +886,7 @@ class WEC(AbstractBaseSolution):
                     else:
                         continue_rule = False
 
+                    next_delete = (-1, -1, 'rotational')
                     if continue_rule:
                         while next_delete[0] is not temp_next_delete:
                             next_delete = self.deletable_bodies[random.randint(0, len(self.deletable_bodies) - 1)]
@@ -890,7 +914,7 @@ class WEC(AbstractBaseSolution):
 
         # Defined set maximum values for pattern
         max_bodies_in_pattern = 4
-        max_num_patterns = 3
+        max_num_patterns = 2
 
         # Select bodies in pattern and number of patterns
         # Check kwargs to see if specific input was given
@@ -1346,9 +1370,10 @@ class WEC(AbstractBaseSolution):
 
     def add_excitation_force(self):
         for body in self.bodies:
-            if body['body'].position[1] > self.sea_level - body['radius']:
+            if body['body'].position[1] >= self.sea_level - body['radius']:
+                amplitude = 42346*body["radius"]*2
                 body["body"].apply_force_at_world_point(
-                    (0, 0.1*body['mass'] * np.sin(self.iter / 100 + body['body'].position[0])),
+                    (0, np.sqrt(2*0.01)*amplitude * np.sin((self.iter / 1000)*2*np.pi - 2*np.pi*body['body'].position[0]/100)),
                     body["body"].local_to_world(body["body"].center_of_gravity))
 
     def add_radiative_force(self):
@@ -1401,7 +1426,6 @@ class WEC(AbstractBaseSolution):
 
                 body['last_velocity'] = body['body'].velocity
                 body['last_position'] = body['body'].position
-                # print(dv, dxy, body['last_position'], body['last_velocity'])
                 if np.linalg.norm(body['last_velocity']) > 50:
                     self.stable_system = False
                     print("ITERATION UNSTABLE")
@@ -1426,7 +1450,7 @@ class WEC(AbstractBaseSolution):
             self.iter += 1
 
             if self.display_visual:
-                time.sleep(.001)
+                time.sleep(.0000001)
 
         self.iter = 0
 
@@ -1444,7 +1468,7 @@ class WEC(AbstractBaseSolution):
         # Calculate number of pieces
         self.pieces = len(self.linear_ptos) + len(self.rotary_ptos) + len(self.bodies)
 
-        return [self.mass, -self.power, self.pieces]
+        return [self.mass, self.power, self.pieces]
 
     # Low-tier random rule selection
     def lowtier_rule_select(self):
@@ -1456,9 +1480,9 @@ class WEC(AbstractBaseSolution):
     # High-tier random rule selection
     def hightier_rule_select(self):
         # Not counting H1 (Generate initial design) as option for rule application
-        num_rules = 5
-        rule = random.randint(2, num_rules+1)
-        # print(rule)
+        num_rules = 6
+        rule = random.randint(2, num_rules)
+        print("HT Rule:", rule)
         return rule
 
     # Perform low-tier rule. Can select randomized values or take specific inputs for each rule
@@ -1473,13 +1497,13 @@ class WEC(AbstractBaseSolution):
         length_max = 100
         angle_min = 0
         angle_max = 90
-        density_min = 500
-        density_max = 1300
+        density_min = 600
+        density_max = 1200
         rest_angle = 0
-        stiffness_min = 1
-        stiffness_max = 25000
-        damping_min = 1
-        damping_max = 2500000
+        stiffness_min = 5000
+        stiffness_max = 15000
+        damping_min = 500000
+        damping_max = 1500000
         mooring_depth = 50
 
         valid_rule = False
@@ -1815,6 +1839,7 @@ class WEC(AbstractBaseSolution):
                     validity = True
             if not validity:
                 break
+        print("Solution Valid?:", validity)
         return validity
 
     # Search through design to check where bodies can be added and where bodies can be deleted

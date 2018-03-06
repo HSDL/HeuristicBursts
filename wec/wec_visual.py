@@ -11,7 +11,9 @@ class wec_visual():
     red = (175, 0, 0)
     green = (0, 175, 0)
     orange = (255, 69, 0)
-
+    light_yellow = (238, 221, 130)
+    olive = (107, 142, 35)
+    dark_orange = (255, 69, 0)
     # Screen Dimensions
     SCREEN_WIDTH = 1000
     SCREEN_HEIGHT = 800
@@ -40,7 +42,7 @@ class wec_visual():
             position[0] = int(position[0]*10 + 400)
             position[1] = -int(position[1]*10 - 400)
             pygame.draw.circle(self.screen, self.black, position, int(radius * 10) + 1)
-            pygame.draw.circle(self.screen, self.grey, position, int(radius*10))
+            pygame.draw.circle(self.screen, self.light_yellow, position, int(radius*10))
         for rotational_pto in device.rotary_ptos_data:
             idxa = rotational_pto['idxa']
             idxb = rotational_pto['idxb']
@@ -50,9 +52,12 @@ class wec_visual():
             pos_b = device.bodies[idxb]['body'].position
             pos_b[0] = int(pos_b[0] * 10 + 400)
             pos_b[1] = -int(pos_b[1] * 10 - 400)
-            pygame.draw.line(self.screen, self.green, pos_a, pos_b, 3)
+            pygame.draw.line(self.screen, self.olive, pos_a, pos_b, 3)
             pygame.draw.circle(self.screen, self.black, pos_a, 3)
             pygame.draw.circle(self.screen, self.black, pos_b, 3)
+            pygame.draw.circle(self.screen, self.olive,
+                               (int((pos_a[0]+pos_b[0])/2), int((pos_a[1]+pos_b[1])/2)),
+                               device.pto_size*10-2)
         for linear_pto in device.linear_ptos_data:
             idxa = linear_pto['idxa']
             idxb = linear_pto['idxb']
@@ -62,9 +67,12 @@ class wec_visual():
             pos_b = device.bodies[idxb]['body'].position
             pos_b[0] = int(pos_b[0] * 10 + 400)
             pos_b[1] = -int(pos_b[1] * 10 - 400)
-            pygame.draw.line(self.screen, self.orange, pos_a, pos_b, 3)
+            pygame.draw.line(self.screen, self.dark_orange, pos_a, pos_b, 3)
             pygame.draw.circle(self.screen, self.black, pos_a, 3)
             pygame.draw.circle(self.screen, self.black, pos_b, 3)
+            pygame.draw.circle(self.screen, self.dark_orange,
+                               (int((pos_a[0] + pos_b[0]) / 2), int((pos_a[1] + pos_b[1]) / 2)),
+                               device.pto_size * 10 - 2)
 
         pygame.draw.circle(self.screen, self.black, (100, 100), 52)
         pygame.draw.circle(self.screen, self.red, (100, 100), 50)
