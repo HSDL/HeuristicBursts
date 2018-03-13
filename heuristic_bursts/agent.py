@@ -37,10 +37,11 @@ class Agent(object):
         self.preferred_rule_tier = 'low'
         self.tiers = ['low', 'high']
         self.tier_weights = [1.0, 0.0]
+        self.tier_weight_change = [0.0, 0.0]
 
         # Initialize simulated annealing values for agent
         # self.TrikiParameter = 2.91*pow(10, -1)
-        self.TrikiParameter = 2.91 * pow(10, -3)
+        self.TrikiParameter = 3.00 * pow(10, -3)
         # self.initial_temperature = 1.65*pow(10, -2)
         self.initial_temperature = 0.006
         self.temperature = self.initial_temperature
@@ -91,6 +92,8 @@ class Agent(object):
                 self.past_candidates_results.append(self.candidate_solution_quality)
 
         self.iteration_count += 1
+        self.tier_weights = (self.tier_weights[0] + self.tier_weight_change[0],
+                             self.tier_weights[1] + self.tier_weight_change[1])
 
         # Tune approach based on evaluation and decision.
 
@@ -121,8 +124,8 @@ class Agent(object):
         # If quality shows candidate is worse, probabilistically accept
         else:
             probability = numpy.exp((self.candidate_solution_quality - self.current_solution_quality)/self.temperature)
-            probability_num = int(probability*100000)
-            random_num = random.randint(1, 100000)
+            probability_num = int(probability*1000000)
+            random_num = random.randint(1, 1000000)
             if random_num <= probability_num:
                 self.current_solution = copy.deepcopy(self.candidate_solution)
                 self.current_results = self.candidate_results

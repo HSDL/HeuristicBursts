@@ -851,9 +851,6 @@ class WEC(AbstractBaseSolution):
                 # print(self.deletable_bodies)
                 if len(self.bodies) > 1:
                     temp_pto = (next_delete[1], next_delete[2])
-                    print('temp pto:,', temp_pto)
-                    print('length rot:', len(self.rotary_ptos), len(self.rotary_ptos_data))
-                    print('length lin:', len(self.linear_ptos), len(self.linear_ptos_data))
                     if temp_pto[1] is 'rotational':
                         temp_pto = self.rotary_ptos_data[temp_pto[0]]
                         if temp_pto['idxa'] == next_delete[0]:
@@ -1426,7 +1423,7 @@ class WEC(AbstractBaseSolution):
 
                 body['last_velocity'] = body['body'].velocity
                 body['last_position'] = body['body'].position
-                if np.linalg.norm(body['last_velocity']) > 50:
+                if np.linalg.norm(body['last_velocity']) > 20:
                     self.stable_system = False
                     print("ITERATION UNSTABLE")
                     print('')
@@ -1474,7 +1471,7 @@ class WEC(AbstractBaseSolution):
     def lowtier_rule_select(self):
         num_rules = 9
         rule = random.randint(1, num_rules)
-        # print(rule)
+        print("LT Rule:", rule)
         return rule
 
     # High-tier random rule selection

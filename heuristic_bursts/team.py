@@ -15,6 +15,7 @@ class Team(object):
     def run(self):
         for i in range(1, self.options.number_of_iterations + 1):
             print("Iteration:", i)
+            print("")
             self.iterate()
             if self.options.is_scheduled() and i % self.options.interaction_period == 0:
                 print("")
