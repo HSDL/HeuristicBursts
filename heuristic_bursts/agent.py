@@ -13,11 +13,14 @@ class Agent(object):
         self.current_solution = heuristic_bursts.solution.Solution()
         current_solution_for_evaluation = copy.deepcopy(self.current_solution)
         self.current_results = current_solution_for_evaluation.evaluate()
+        self.all_solution_qualities = []
 
         # Instantiate lists for team solutions
         self.team_current_solutions = []
+        self.team_current_results = []
         self.team_current_qualities = []
         self.team_solution_weights = []
+        self.team_all_qualities = []
 
         # Set weights for evaluation metrics
         self.metrics = []
@@ -121,17 +124,21 @@ class Agent(object):
         if self.candidate_solution_quality > self.current_solution_quality:
             self.current_solution = copy.deepcopy(self.candidate_solution)
             self.current_results = self.candidate_results
+            self.current_solution_quality = self.candidate_solution_quality
+
         # If quality shows candidate is worse, probabilistically accept
         else:
             probability = numpy.exp((self.candidate_solution_quality - self.current_solution_quality)/self.temperature)
-            probability_num = int(probability*1000000)
-            random_num = random.randint(1, 1000000)
-            if random_num <= probability_num:
+            random_num = random.random()
+            if random_num <= probability:
                 self.current_solution = copy.deepcopy(self.candidate_solution)
                 self.current_results = self.candidate_results
+                self.current_solution_quality = self.candidate_solution_quality
             print('probability:', probability)
             print('temp:', self.temperature)
             print('')
+
+        self.all_solution_qualities.append(self.current_solution_quality)
 
         # Update temperature every 10th iteration
         if self.iteration_count % 10 == 0:
@@ -156,9 +163,14 @@ class Agent(object):
             team_solution_probabilities.append(self.team_solution_weights[i]/sum(self.team_solution_weights))
 
         # Select which team solution to use starting in next iteration
-        self.current_solution = copy.deepcopy(numpy.random.choice(self.team_current_solutions, p=team_solution_probabilities))
-        current_solution_for_evaluation = copy.deepcopy(self.current_solution)
-        self.current_results = current_solution_for_evaluation.evaluate()
+        self.indices = []
+        for i in range(0, len(self.team_current_solutions)):
+            self.indices.append(i)
+        solution_selected = numpy.random.choice(self.indices, p=team_solution_probabilities)
+        self.current_solution = copy.deepcopy(self.team_current_solutions[solution_selected])
+        self.current_results = self.team_current_results[solution_selected]
+        print(self.current_results)
+        self.all_solution_qualities = self.team_all_qualities[solution_selected]
         # self.current_solution_quality = sum([self.current_results[i] * self.weights[i] * self.evaluation_adjustments[i]
         #                                      for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
         self.current_solution_quality = self.current_results[1]/self.current_results[0]

@@ -17,7 +17,7 @@ import time
 class WEC(AbstractBaseSolution):
     # TODO: Make sure index is lowered if body deleted is lower than next to be checked
     simulation_dt = 0.01
-    simulation_steps = 3000
+    simulation_steps = 2000
     initial_steps = 7000
     error_bias = pow(1.0 - 0.1, 10.0)
     spectrum = sp.Spectrum('bretschneider', fp=0.5, Hm0=2)
@@ -71,13 +71,12 @@ class WEC(AbstractBaseSolution):
         self.applied_rules = []
 
         # Initialize design
-        self.add_body('sphere', 650.0, (0, 0), radius=2)
-        self.lowtier_rule_perform(1, location=(0, 0), radius=2, density=650.0, stiffness=1000, damping=1000000)
-        self.lowtier_rule_perform(1, location=(0, 2), radius=2, density=650.0, stiffness=1000, damping=1000000)
-        self.lowtier_rule_perform(2, location=(0, 3), radius=2, density=1000.0, stiffness=1000, damping=1000000)
+        self.add_body('sphere', 500.0, (0, 0), radius=2)
+        self.lowtier_rule_perform(1, location=(0, 0), radius=2, stiffness=1000, damping=1000000)
+        self.lowtier_rule_perform(1, location=(0, 2), radius=2, stiffness=1000, damping=1000000)
+        self.lowtier_rule_perform(2, location=(0, 3), radius=2, stiffness=1000, damping=1000000)
 
         self.applied_rules = []
-
 
     def add_body(self, body_shape, density, position, **kwargs):
         # Calculate properties of body
@@ -253,14 +252,31 @@ class WEC(AbstractBaseSolution):
             del self.groove_joints[index * 2]
 
     def repositioning(self, index, initial_body, new_body):
+        self.bodies_shifted_upwards_out_of_water = False
         for relative_position in range(0, 4):
             self.reposition_branch(index, relative_position, initial_body, new_body)
+
+        if self.bodies_shifted_upwards_out_of_water:
+            for i in range(0, len(self.bodies)):
+                temp_body_index = i
+                temp_body = self.bodies[i]
+                temp_body_pos = temp_body['body'].position
+                temp_body_pos[0] = temp_body_pos[0]
+                temp_body_pos[1] -= self.rad_diff
+                self.remove_body(i)
+                self.add_body(temp_body['body_shape'], temp_body['density'], temp_body_pos,
+                              radius=temp_body['radius'], length=temp_body['length'],
+                              angle_offset=temp_body['angle_offset'])
+                self.bodies.insert(i, self.bodies[-1])
+                del self.bodies[-1]
+                self.joint_reinstancing(i)
+                self.mooring_reinstancing(i)
 
     def reposition_branch(self, body_index, relative_position, initial_body, new_body):
         old_pos = initial_body['body'].position
         R1 = initial_body['radius']
         R2 = new_body['radius']
-        rad_diff = R2 - R1
+        self.rad_diff = R2 - R1
 
         bodies_to_check = []
         bodies_to_shift = []
@@ -308,13 +324,14 @@ class WEC(AbstractBaseSolution):
             temp_body_pos = temp_body['body'].position
 
             if relative_position == 0:
-                temp_body_pos[0] = temp_body_pos[0] + rad_diff
+                temp_body_pos[0] = temp_body_pos[0] + self.rad_diff
             elif relative_position == 1:
-                temp_body_pos[1] = temp_body_pos[1] + rad_diff
+                temp_body_pos[1] = temp_body_pos[1] + self.rad_diff
+                self.bodies_shifted_upwards_out_of_water = True
             elif relative_position == 2:
-                temp_body_pos[0] = temp_body_pos[0] - rad_diff
+                temp_body_pos[0] = temp_body_pos[0] - self.rad_diff
             elif relative_position == 3:
-                temp_body_pos[1] = temp_body_pos[1] - rad_diff
+                temp_body_pos[1] = temp_body_pos[1] - self.rad_diff
 
             self.remove_body(temp_body_index)
             self.add_body(temp_body['body_shape'], temp_body['density'], temp_body_pos,
@@ -464,10 +481,19 @@ class WEC(AbstractBaseSolution):
     def relocate_body_with_joint(self, body_index, joint_index, joint_type, new_position, attach_body_index):
         temp_body = self.bodies[body_index]
         shape = temp_body["body_shape"]
-        density = temp_body["density"]
         radius = temp_body["radius"]
         length = temp_body["length"]
         angle_offset = temp_body["angle_offset"]
+
+        if radius + new_position[1] < self.sea_level:
+            density = 1000
+        elif new_position[1] - radius > self.sea_level:
+            density = 350
+        else:
+            h = radius - new_position[1] + self.sea_level
+            c = np.sqrt(h * (2 * radius - h))
+            density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)) / \
+                      ((4.0 / 3.0) * np.pi * np.power(radius, 3))
 
         if joint_type is 'rotational':
             temp_joint = self.rotary_ptos_data[joint_index]
@@ -519,19 +545,41 @@ class WEC(AbstractBaseSolution):
     def swap_bodies(self, idxa, idxb):
         temp_body_a = self.bodies[idxa]
         temp_body_b = self.bodies[idxb]
+        temp_body_a_pos = temp_body_a['body'].position
+        temp_body_b_pos = temp_body_b['body'].position
         initial_body_a = temp_body_a
         initial_body_b = temp_body_b
 
+        if temp_body_b['radius'] + temp_body_a_pos[1] < self.sea_level:
+            density = 1000
+        elif temp_body_a_pos[1] - temp_body_b['radius'] > self.sea_level:
+            density = 350
+        else:
+            h = temp_body_b['radius'] - temp_body_a_pos[1] + self.sea_level
+            c = np.sqrt(h * (2 * temp_body_b['radius'] - h))
+            density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)) / \
+                      ((4.0 / 3.0) * np.pi * np.power(temp_body_b['radius'], 3))
+        print(density)
         self.remove_body(idxa)
-        self.add_body(temp_body_b['body_shape'], temp_body_b['density'], temp_body_a['body'].position,
+        self.add_body(temp_body_b['body_shape'], density, temp_body_a['body'].position,
                       radius=temp_body_b['radius'], length=temp_body_b['length'], angle_offset=temp_body_b['angle_offset'])
         temp_body = self.bodies[-1]
         new_body_a = temp_body
         self.bodies.insert(idxa, temp_body)
         del self.bodies[-1]
 
+        if temp_body_a['radius'] + temp_body_b_pos[1] < self.sea_level:
+            density = 1000
+        elif temp_body_b_pos[1] - temp_body_a['radius'] > self.sea_level:
+            density = 350
+        else:
+            h = temp_body_a['radius'] - temp_body_b_pos[1] + self.sea_level
+            c = np.sqrt(h * (2 * temp_body_a['radius'] - h))
+            density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)) / \
+                      ((4.0 / 3.0) * np.pi * np.power(temp_body_a['radius'], 3))
+        print(density)
         self.remove_body(idxb)
-        self.add_body(temp_body_a['body_shape'], temp_body_a['density'], temp_body_b['body'].position,
+        self.add_body(temp_body_a['body_shape'], density, temp_body_b['body'].position,
                       radius=temp_body_a['radius'], length=temp_body_a['length'], angle_offset=temp_body_a['angle_offset'])
         temp_body = self.bodies[-1]
         new_body_b = temp_body
@@ -1394,6 +1442,7 @@ class WEC(AbstractBaseSolution):
 
     def evaluate(self):
         self.stable_system = True
+        ss_count = 0
         energy = np.zeros(2)
         if self.display_visual:
             self.display = wec.wec_visual.wec_visual()
@@ -1405,7 +1454,9 @@ class WEC(AbstractBaseSolution):
 
             # Add forces
             self.add_buoyant_force()
-            self.add_excitation_force()
+            # Add wave force once steady-state has been reached
+            if self.iter > self.initial_steps:
+                self.add_excitation_force()
             # self.add_radiative_force()
             self.add_viscous_force()
 
@@ -1425,15 +1476,40 @@ class WEC(AbstractBaseSolution):
                 body['last_position'] = body['body'].position
                 if np.linalg.norm(body['last_velocity']) > 20:
                     self.stable_system = False
-                    print("ITERATION UNSTABLE")
+                    print("ITERATION UNSTABLE: BODY VELOCITY EXCEEDS MAXIMUM")
                     print('')
                     break
+
+            # Check for steady state
+            if self.iter < self.initial_steps:
+                steady_state_reached = False
+                temp_steady_state = True
+                for body in self.bodies:
+                    velocity = np.linalg.norm(body['last_velocity'])
+                    # print(velocity)
+                    if velocity >= 0.25:
+                        temp_steady_state = False
+                        break
+                if temp_steady_state:
+                    ss_count += 1
+                else:
+                    ss_count = 0
+                if ss_count > 500:
+                    steady_state_reached = True
+                if steady_state_reached:
+                    self.iter = self.initial_steps
+                    print("ss reached")
+                    print("")
 
             # Pull position data
             self.pull_position_data()
 
             # Track PTO energy extraction after reaching steady-state
-            if self.iter > self.initial_steps:
+            if self.iter >= self.initial_steps:
+                if not steady_state_reached:
+                    self.stable_system = False
+                    print("ITERATION UNSTABLE: STEADY-STATE NOT REACHED")
+                    print('')
                 for pto in self.linear_ptos:
                     relative_velocity = np.linalg.norm(pto.a.velocity - pto.b.velocity)
                     energy[0] += np.power(relative_velocity, 2) * pto.damping * self.simulation_dt
@@ -1469,7 +1545,7 @@ class WEC(AbstractBaseSolution):
 
     # Low-tier random rule selection
     def lowtier_rule_select(self):
-        num_rules = 9
+        num_rules = 8
         rule = random.randint(1, num_rules)
         print("LT Rule:", rule)
         return rule
@@ -1512,11 +1588,6 @@ class WEC(AbstractBaseSolution):
                 shape = 'sphere'
             else:
                 shape = 'cylinder'
-
-            if kwargs.get('density') is not None:
-                density = kwargs['density']
-            else:
-                density = random.randint(density_min, density_max)
             if kwargs.get('radius') is not None:
                 radius = kwargs['radius']
             else:
@@ -1558,6 +1629,20 @@ class WEC(AbstractBaseSolution):
             elif location[1] == 3:
                 x = body_pos[0]
                 y = body_pos[1] - body_radius - radius - self.pto_size
+
+            # If not specified density, select density to keep system in steady-state condition
+            if kwargs.get('density') is not None:
+                density = kwargs['density']
+            else:
+                if radius + y < self.sea_level:
+                    density = 1000
+                elif y - radius > self.sea_level:
+                    density = 350
+                else:
+                    h = radius - y + self.sea_level
+                    c = np.sqrt(h*(2*radius - h))
+                    density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h))/ \
+                              ((4.0 / 3.0) * np.pi * np.power(radius, 3))
 
             self.add_rotational_body(shape, density, (x, y), body, rest_angle, stiffness, damping,
                                      radius=radius, length=length, angle_offset=angle)
@@ -1570,11 +1655,6 @@ class WEC(AbstractBaseSolution):
                 shape = 'sphere'
             else:
                 shape = 'cylinder'
-
-            if kwargs.get('density') is not None:
-                density = kwargs['density']
-            else:
-                density = random.randint(density_min, density_max)
             if kwargs.get('radius') is not None:
                 radius = kwargs['radius']
             else:
@@ -1616,6 +1696,20 @@ class WEC(AbstractBaseSolution):
             elif location[1] == 3:
                 x = body_pos[0]
                 y = body_pos[1] - body_radius - radius - self.pto_size
+
+            # If not specified density, select density to keep system in steady-state condition
+            if kwargs.get('density') is not None:
+                density = kwargs['density']
+            else:
+                if radius + y < self.sea_level:
+                    density = 1000
+                elif y - radius > self.sea_level:
+                    density = 350
+                else:
+                    h = radius - y + self.sea_level
+                    c = np.sqrt(h * (2*radius - h))
+                    density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)) / \
+                              ((4.0 / 3.0) * np.pi * np.power(radius, 3))
 
             self.add_linear_body(shape, density, (x, y), body, stiffness, damping,
                                  radius=radius, length=length, angle_offset=angle)
@@ -1669,22 +1763,22 @@ class WEC(AbstractBaseSolution):
                 self.change_body_dimensions(body, radius=radius, length=length, angle=angle)
                 self.applied_rules.append('L5')
 
-        # Change body density
-        elif rule == 6:
-            if len(self.bodies) > 0:
-                if kwargs.get('body') is not None:
-                    body = kwargs['body']
-                else:
-                    body = random.randint(0, len(self.bodies)-1)
-                if kwargs.get('density') is not None:
-                    density = kwargs['density']
-                else:
-                    density = random.randint(density_min, density_max)
-                self.change_body_density(body, density)
-                self.applied_rules.append('L6')
+        # # Change body density
+        # elif rule == 6:
+        #     if len(self.bodies) > 0:
+        #         if kwargs.get('body') is not None:
+        #             body = kwargs['body']
+        #         else:
+        #             body = random.randint(0, len(self.bodies)-1)
+        #         if kwargs.get('density') is not None:
+        #             density = kwargs['density']
+        #         else:
+        #             density = random.randint(density_min, density_max)
+        #         self.change_body_density(body, density)
+        #         self.applied_rules.append('L6')
 
         # Relocate body with joint
-        elif rule == 7:
+        elif rule == 6:
             if len(self.bodies) > 1:
                 self.rule_check()
                 if kwargs.get('removal') is not None:
@@ -1717,10 +1811,10 @@ class WEC(AbstractBaseSolution):
                     x = attachment_body_pos[0]
                     y = attachment_body_pos[1] - attachment_body_radius - radius- self.pto_size
                 self.relocate_body_with_joint(removal[0], removal[1], removal[2], (x, y), attachment_body)
-                self.applied_rules.append('L7')
+                self.applied_rules.append('L6')
 
         # Swap bodies
-        elif rule == 8:
+        elif rule == 7:
             if len(self.bodies) > 1:
                 if kwargs.get('body_a') is not None:
                     body_a = kwargs['body_a']
@@ -1734,10 +1828,10 @@ class WEC(AbstractBaseSolution):
                         if body_a != body_b:
                             break
                 self.swap_bodies(body_a, body_b)
-                self.applied_rules.append('L8')
+                self.applied_rules.append('L7')
 
         # Change joint coefficients
-        elif rule == 9:
+        elif rule == 8:
             if len(self.rotary_ptos) > 0 or len(self.linear_ptos) > 0:
                 if kwargs.get('joint_type') is not None:
                     joint_type = kwargs['joint_type']
@@ -1766,7 +1860,7 @@ class WEC(AbstractBaseSolution):
                 else:
                     damping = random.randint(damping_min, damping_max)
                 self.change_joint_coefficients(joint_index, joint_type, stiffness=stiffness, damping=damping)
-                self.applied_rules.append('L9')
+                self.applied_rules.append('L8')
 
         # Add mooring system
         elif rule == 10:

@@ -30,15 +30,21 @@ class Team(object):
     def interact(self):
         # Pull agents current solutions
         self.current_solutions = []
+        self.current_results = []
         self.current_qualities = []
+        self.all_qualities = []
         for agent in self.agent_list:
             self.current_solutions.append(agent.current_solution)
+            self.current_results.append(agent.current_results)
             self.current_qualities.append(agent.current_solution_quality)
+            self.all_qualities.append(agent.all_solution_qualities)
             print(agent.current_results)
 
         print('')
         # Share those solutions
         for agent in self.agent_list:
             agent.team_current_solutions = copy.deepcopy(self.current_solutions)
+            agent.team_current_results = copy.deepcopy(self.current_results)
             agent.team_current_qualities = copy.deepcopy(self.current_qualities)
+            agent.team_all_qualities = copy.deepcopy(self.all_qualities)
             agent.interact()
