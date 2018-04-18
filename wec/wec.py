@@ -559,7 +559,6 @@ class WEC(AbstractBaseSolution):
             c = np.sqrt(h * (2 * temp_body_b['radius'] - h))
             density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)) / \
                       ((4.0 / 3.0) * np.pi * np.power(temp_body_b['radius'], 3))
-        print(density)
         self.remove_body(idxa)
         self.add_body(temp_body_b['body_shape'], density, temp_body_a['body'].position,
                       radius=temp_body_b['radius'], length=temp_body_b['length'], angle_offset=temp_body_b['angle_offset'])
@@ -577,7 +576,6 @@ class WEC(AbstractBaseSolution):
             c = np.sqrt(h * (2 * temp_body_a['radius'] - h))
             density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)) / \
                       ((4.0 / 3.0) * np.pi * np.power(temp_body_a['radius'], 3))
-        print(density)
         self.remove_body(idxb)
         self.add_body(temp_body_a['body_shape'], density, temp_body_b['body'].position,
                       radius=temp_body_a['radius'], length=temp_body_a['length'], angle_offset=temp_body_a['angle_offset'])
@@ -1091,9 +1089,6 @@ class WEC(AbstractBaseSolution):
                             (check_body_pos[0] == attachment_body_pos[0] and check_body_pos[1] < attachment_body_pos[1]):
                         attachment_body_index = check_body_index
 
-            # print("Attachment side: ", attachment_side)
-            # print("Attachment body: ", attachment_body_index)
-
             # Locate pattern body at side of pattern closest to attachment side
             # (i.e. right-most body if attachment is on left, and vice-versa)
             starting_pattern_body_index = 0
@@ -1127,16 +1122,27 @@ class WEC(AbstractBaseSolution):
             x_shift = attachment_body_pos[0] - starting_body_pos[0] + side_shift
             y_shift = attachment_body_pos[1] - starting_body_pos[1]
 
-            # print(x_shift)
-
             for index in range(0, len(pattern_bodies)):
                 temp_body = pattern_bodies[index]
                 temp_body_data = temp_body['body']
                 original_position = temp_body['original_position']
                 shape = 'sphere'
                 radius = temp_body_data['radius']
-                density = temp_body_data['density']
-                self.add_body(shape, density, (original_position[0] + x_shift, original_position[1] + y_shift),
+
+                new_x = original_position[0] + x_shift
+                new_y = original_position[1] + y_shift
+
+                if radius + new_y < self.sea_level:
+                    density = 1000
+                elif new_y - radius > self.sea_level:
+                    density = 350
+                else:
+                    h = radius - new_y + self.sea_level
+                    c = np.sqrt(h*(2*radius - h))
+                    density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h))/ \
+                              ((4.0 / 3.0) * np.pi * np.power(radius, 3))
+
+                self.add_body(shape, density, (new_x, new_y),
                               radius=radius)
 
             self.add_rotational_pto(attachment_body_index,
@@ -1168,9 +1174,28 @@ class WEC(AbstractBaseSolution):
                         resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2) + self.pto_size
                         self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
 
-            # print("Starting pattern body: ", starting_pattern_body_index)
-            # for body in pattern_bodies:
-            #     print("Original position: ", body['original_position'])
+        # TODO: FIGURE OUT METHOD FOR ENSURE NO BODIES OUT OF WATER IN THIS CASE
+        bodies_out_of_water = False
+        for body in self.bodies:
+            if body['body'].position[1] - body['radius'] >= self.sea_level:
+                bodies_out_of_water = True
+                break
+
+        i = 0
+        while bodies_out_of_water and i < 50:
+            self.rule_check()
+            for deletable in self.deletable_bodies:
+                temp_body_check = self.bodies[deletable[0]]
+                if temp_body_check['body'].position[1] - temp_body_check['radius'] >= self.sea_level:
+                    self.remove_body_with_joint(deletable[0], deletable[1], deletable[2])
+                    break
+            bodies_out_of_water = False
+            for body in self.bodies:
+                if body['body'].position[1] - body['radius'] >= self.sea_level:
+                    bodies_out_of_water = True
+                    break
+            i += 1
+
         self.applied_rules.append('H5')
 
     def standardize(self, **kwargs):
@@ -1237,18 +1262,18 @@ class WEC(AbstractBaseSolution):
             for i in range(0, num_to_standardize):
                 body_index = bodies_to_standardize[i]
                 body = self.bodies[body_index]
-                body_density = body['density']
+                # body_density = body['density']
                 body_radius = body['radius']
                 body_length = body['length']
                 body_angle_offset = body['angle_offset']
 
-                density_diff = base_density - body_density
+                # density_diff = base_density - body_density
                 radius_diff = base_radius - body_radius
 
-                new_density = body_density + density_diff*standardization_rate
+                # new_density = body_density + density_diff*standardization_rate
                 new_radius = int(body_radius + radius_diff*standardization_rate)
 
-                self.change_body_density(body_index, new_density)
+                # self.change_body_density(body_index, new_density)
                 self.change_body_dimensions(body_index,
                                             radius=new_radius, length=body_length, angle_offset=body_angle_offset)
                 # print("Body: ", body_index, ", old radius: ", body_radius, ", new radius: ", new_radius)
@@ -1337,7 +1362,7 @@ class WEC(AbstractBaseSolution):
                 new_stiffness = pto_stiffness + stiffness_diff*standardization_rate
                 new_damping = pto_damping + damping_diff*standardization_rate
 
-                self.lowtier_rule_perform(9, joint_index=pto_index, joint_type=pto_type,
+                self.lowtier_rule_perform(8, joint_index=pto_index, joint_type=pto_type,
                                           stiffness=new_stiffness, damping=new_damping)
                 # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
                 del self.applied_rules[-1]
@@ -1931,6 +1956,7 @@ class WEC(AbstractBaseSolution):
             if not validity:
                 break
         print("Solution Valid?:", validity)
+        print("")
         return validity
 
     # Search through design to check where bodies can be added and where bodies can be deleted

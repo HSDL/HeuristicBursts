@@ -10,6 +10,8 @@ import wec.wec
 import wec.wec_visual
 import time
 
+import numpy
+
 options = heuristic_bursts.options.Options()
 
 # Instantiate team
@@ -31,25 +33,24 @@ quality = team.agent_list[0].current_solution_quality
 rules = team.agent_list[0].current_solution.applied_rules
 all_qualities = team.agent_list[0].all_solution_qualities
 
+print("Solution Results:", solution)
+print("Solution Quality:", quality)
+print("Rules Applied:", rules)
+
 display = wec.wec_visual.wec_visual()
 
 display.display(team.agent_list[0].current_solution)
 time.sleep(1)
 display.wait_to_continue()
 
-
 plt.figure(1)
 plt.subplot(111)
 plt.xlabel('Iteration Number')
 plt.ylabel('Solution Quality [W/kg]')
-plt.title('Solution Quality Using Only Higher-Tier Rules (500 Iterations per Agent)')
+plt.title('Solution Quality Using Only Lower-Tier Rules (100 Iterations per Agent)')
 plt.plot(all_qualities)
 
 plt.show()
-
-print("Solution Results:", solution)
-print("Solution Quality:", quality)
-print("Rules Applied:", rules)
 
 display.wait_to_continue()
 agent.current_solution.display_visual = True

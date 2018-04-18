@@ -8,7 +8,11 @@ class Team(object):
         self.options = options
         self.agent_list = []
         self.current_solutions = []
+        self.current_results = []
         self.current_qualities = []
+        self.all_qualities = []
+        self.all_simulation_data = []
+
         for i in range(self.options.number_of_agents):
             self.agent_list.append(heuristic_bursts.agent.Agent(self.options))
 
@@ -33,18 +37,21 @@ class Team(object):
         self.current_results = []
         self.current_qualities = []
         self.all_qualities = []
+        self.all_simulation_data = []
         for agent in self.agent_list:
             self.current_solutions.append(agent.current_solution)
             self.current_results.append(agent.current_results)
             self.current_qualities.append(agent.current_solution_quality)
             self.all_qualities.append(agent.all_solution_qualities)
+            self.all_simulation_data.append(agent.simulation_data)
             print(agent.current_results)
-
         print('')
+
         # Share those solutions
         for agent in self.agent_list:
             agent.team_current_solutions = copy.deepcopy(self.current_solutions)
             agent.team_current_results = copy.deepcopy(self.current_results)
             agent.team_current_qualities = copy.deepcopy(self.current_qualities)
             agent.team_all_qualities = copy.deepcopy(self.all_qualities)
+            agent.team_all_simulation_data = copy.deepcopy(self.all_simulation_data)
             agent.interact()

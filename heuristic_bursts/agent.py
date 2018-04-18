@@ -3,6 +3,9 @@ import copy
 import heuristic_bursts.solution
 import random
 
+# DELETE THIS AFTER
+import wec.wec_visual
+
 
 class Agent(object):
     def __init__(self, options):
@@ -21,13 +24,15 @@ class Agent(object):
         self.team_current_qualities = []
         self.team_solution_weights = []
         self.team_all_qualities = []
+        self.team_all_simulation_data = []
 
         # Set weights for evaluation metrics
         self.metrics = []
         self.weights = [1/2, 1/2, 0]
         self.evaluation_adjustments = [-1, 1, 0]
-        self.current_solution_quality = numpy.Inf
-        self.candidate_solution_quality = numpy.Inf
+        self.current_solution_quality = 0.0
+        self.candidate_solution_quality = 0.0
+        self.previous_solution_quality = self.current_solution_quality
 
         # Determine agent learning style
         if options.learning_style is 'multinomial':
@@ -41,6 +46,7 @@ class Agent(object):
         self.tiers = ['low', 'high']
         self.tier_weights = [1.0, 0.0]
         self.tier_weight_change = [0.0, 0.0]
+        self.rule_accepted = 0
 
         # Initialize simulated annealing values for agent
         # self.TrikiParameter = 2.91*pow(10, -1)
@@ -54,37 +60,39 @@ class Agent(object):
         # Initialize iteration count for individual agent
         self.iteration_count = 1
 
+        self.simulation_data = []
+
     def iterate(self):
         # Deep copy the candidate solution
         self.candidate_solution = copy.deepcopy(self.current_solution)
 
         # Decide which action to take
-        apply_lowtier_rule = False
-        apply_hightier_rule = False
+        self.apply_lowtier_rule = False
+        self.apply_hightier_rule = False
 
         # Each tier has its own weight for selection
         self.preferred_rule_tier = str(numpy.random.choice(self.tiers, p=self.tier_weights))
-        # print('')
-        # print('Preference:', self.preferred_rule_tier)
+
         if self.preferred_rule_tier == 'low':
-            apply_lowtier_rule = True
+            self.apply_lowtier_rule = True
         elif self.preferred_rule_tier == 'high':
-            apply_hightier_rule = True
+            self.apply_hightier_rule = True
 
         # Depending which tier the agent prefers in this iteration, implement one rule from that tier
-        if apply_lowtier_rule:
-            rule = self.candidate_solution.lowtier_rule_select()
-            # print("Rule Selected: ", rule)
-            self.candidate_solution.lowtier_rule_perform(rule)
-        elif apply_hightier_rule:
-            rule = self.candidate_solution.hightier_rule_select()
-            # print("Rule Selected: ", rule)
-            self.candidate_solution.hightier_rule_perform(rule)
+        if self.apply_lowtier_rule:
+            self.rule = self.candidate_solution.lowtier_rule_select()
+            self.candidate_solution.lowtier_rule_perform(self.rule)
+        elif self.apply_hightier_rule:
+            self.rule = self.candidate_solution.hightier_rule_select()
+            self.candidate_solution.hightier_rule_perform(self.rule)
 
-        # Deep copy the candidate to evaluate. Copying allows the candidate's position to be 'reset' after evalutation
+        # Deep copy the candidate to evaluate. Copying allows the candidate's position to be 'reset' after evaluation
         self.candidate_solution_for_evaluation = copy.deepcopy(self.candidate_solution)
 
         # Apply that action and evaluate the outcome
+        self.previous_solution_quality = self.current_solution_quality
+        self.rule_accepted = 0
+        self.error = 'none'
         if self.candidate_solution.is_valid():
             # self.candidate_solution_for_evaluation.display_visual = True
             self.candidate_results = self.candidate_solution_for_evaluation.evaluate()
@@ -93,6 +101,19 @@ class Agent(object):
                 # Compare quality of candidate solution to current solution
                 self.evaluate()
                 self.past_candidates_results.append(self.candidate_solution_quality)
+            else:
+                self.error = 'unstable'
+        else:
+            self.candidate_solution_quality = self.previous_solution_quality
+            self.error = 'invalid'
+
+        # ['repetition', 'iteration', 'rule tier', 'rule number', 'quality before rule', 'quality after rule',
+        # 'current solution quality', 'rule acceptance', 'lower tier preference', 'higher tier preference',
+        # 'error']
+        self.simulation_data.append([0, self.iteration_count, self.preferred_rule_tier, self.rule,
+                                     self.previous_solution_quality, self.candidate_solution_quality,
+                                     self.current_solution_quality, self.rule_accepted,
+                                     self.tier_weights[0], self.tier_weights[1], self.error])
 
         self.iteration_count += 1
         self.tier_weights = (self.tier_weights[0] + self.tier_weight_change[0],
@@ -102,19 +123,18 @@ class Agent(object):
 
     def compare_solutions(self, solution_a_results, solution_b_results):
         weighted_metric_comparison = [pow((solution_b_results[i]/solution_a_results[i]), self.comparison_inversions[i])
-                                     *self.weights[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)]
-        # print('')
-        # print("Comparison:", weighted_metric_comparison)
+                                      * self.weights[i] for i in
+                                      range(heuristic_bursts.solution.Solution.number_of_metrics)]
         result_ratio = sum(weighted_metric_comparison)
         return result_ratio
 
     def evaluate(self):
         # Calculate solution quality of current solution and candidate solution
-        # self.current_solution_quality = sum([self.current_results[i] * self.weights[i] * self.evaluation_adjustments[i] for i in
-        #                                  range(heuristic_bursts.solution.Solution.number_of_metrics)])
+        # self.current_solution_quality = sum([self.current_results[i] * self.weights[i] *
+        # self.evaluation_adjustments[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
         self.current_solution_quality = self.current_results[1]/self.current_results[0]
-        # self.candidate_solution_quality = sum([self.candidate_results[i] * self.weights[i] * self.evaluation_adjustments[i] for i in
-        #                                  range(heuristic_bursts.solution.Solution.number_of_metrics)])
+        # self.candidate_solution_quality = sum([self.candidate_results[i] * self.weights[i] *
+        # self.evaluation_adjustments[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
         self.candidate_solution_quality = self.candidate_results[1]/self.candidate_results[0]
         print("current quality:", self.current_solution_quality)
         print("candidate quality:", self.candidate_solution_quality)
@@ -125,6 +145,7 @@ class Agent(object):
             self.current_solution = copy.deepcopy(self.candidate_solution)
             self.current_results = self.candidate_results
             self.current_solution_quality = self.candidate_solution_quality
+            self.rule_accepted = 1
 
         # If quality shows candidate is worse, probabilistically accept
         else:
@@ -134,6 +155,8 @@ class Agent(object):
                 self.current_solution = copy.deepcopy(self.candidate_solution)
                 self.current_results = self.candidate_results
                 self.current_solution_quality = self.candidate_solution_quality
+                self.rule_accepted = 1
+
             print('probability:', probability)
             print('temp:', self.temperature)
             print('')
@@ -167,10 +190,14 @@ class Agent(object):
         for i in range(0, len(self.team_current_solutions)):
             self.indices.append(i)
         solution_selected = numpy.random.choice(self.indices, p=team_solution_probabilities)
+
         self.current_solution = copy.deepcopy(self.team_current_solutions[solution_selected])
         self.current_results = self.team_current_results[solution_selected]
         print(self.current_results)
         self.all_solution_qualities = self.team_all_qualities[solution_selected]
-        # self.current_solution_quality = sum([self.current_results[i] * self.weights[i] * self.evaluation_adjustments[i]
-        #                                      for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
+        self.simulation_data = self.team_all_simulation_data[solution_selected]
+        # self.current_solution_quality = sum([self.current_results[i] * self.weights[i]
+        # * self.evaluation_adjustments[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
         self.current_solution_quality = self.current_results[1]/self.current_results[0]
+
+        # TODO: FIGURE OUT QUALITY APPEND PROBLEM
