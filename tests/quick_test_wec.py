@@ -25,15 +25,15 @@ def test_simulation_of_wec():
     # device.hightier_rule_perform(4)
     # device.lowtier_rule_perform(device.lowtier_rule_select())
     # device.hightier_rule_perform(5)
-    # device.lowtier_rule_perform(1, location=(3, 0), radius=1)
+    # device.lowtier_rule_perform(1, location=(4, 0), radius=1)
     # device.lowtier_rule_perform(1, location=(3, 2), radius=1)
     # device.lowtier_rule_perform(2, location=(3, 3), radius=1)
-    device.hightier_rule_perform(2)
-    device.hightier_rule_perform(4, multiplier=0.5)
-    device.hightier_rule_perform(6)
+    # device.hightier_rule_perform(2)
+    # device.hightier_rule_perform(4, multiplier=0.5)
+    # device.hightier_rule_perform(6)
     # device.hightier_rule_perform(2)
     # device.hightier_rule_perform(3)
-    device.hightier_rule_perform(6)
+    # device.hightier_rule_perform(6)
 
     # display.display(device)
     # time.sleep(2)
@@ -73,9 +73,10 @@ def test_simulation_of_wec():
 
     print(device.applied_rules)
 
-    # device.display_visual = True
+    device.display_visual = True
 
     device.evaluate()
-
+    print(device.power)
+    print(device.mass)
     print(device.power/device.mass)
 

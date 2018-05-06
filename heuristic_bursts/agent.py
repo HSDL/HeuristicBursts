@@ -50,9 +50,10 @@ class Agent(object):
 
         # Initialize simulated annealing values for agent
         # self.TrikiParameter = 2.91*pow(10, -1)
-        self.TrikiParameter = 3.00 * pow(10, -3)
+        # TODO: CHANGE TRIKI TO 3E-3 AND TEMP TO .006
+        self.TrikiParameter = 5.00 * pow(10, -7)
         # self.initial_temperature = 1.65*pow(10, -2)
-        self.initial_temperature = 0.006
+        self.initial_temperature = 0.002
         self.temperature = self.initial_temperature
         self.past_candidates_results = []
         self.candidate_variance = 1
@@ -170,6 +171,8 @@ class Agent(object):
     def update_temp(self):
         self.candidate_variance = numpy.var(self.past_candidates_results)
         self.temperature = self.temperature*(1-(self.temperature*self.TrikiParameter)/self.candidate_variance)
+        if self.temperature < 1.0 * pow(10, -10):
+            self.temperature = 1.0 * pow(10, -10)
         self.past_candidates_results = []
 
     def interact(self):

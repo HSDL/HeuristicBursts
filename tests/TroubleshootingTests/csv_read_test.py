@@ -4,9 +4,9 @@ import numpy
 import matplotlib
 import matplotlib.pyplot as plt
 
-rep_num = 28
+rep_num = 4
 
-with open('lower_tier_only_300_iterations.csv', 'r') as sim_data_file:
+with open('lower_tier_only_1000_iterations.csv', 'r') as sim_data_file:
     csv_reader = csv.DictReader(sim_data_file)
 
     rep_qualities = []

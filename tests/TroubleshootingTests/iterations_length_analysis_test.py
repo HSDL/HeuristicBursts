@@ -4,10 +4,10 @@ import numpy
 import matplotlib
 import matplotlib.pyplot as plt
 
-num_iter = 300
-max_allowed_qual = 750
+num_iter = 1000
+max_allowed_qual = 100000
 
-with open('lower_tier_only_300_iterations.csv', 'r') as sim_data_file:
+with open('lower_tier_only_1000_iterations.csv', 'r') as sim_data_file:
     csv_reader = csv.DictReader(sim_data_file)
 
     valid_reps = []

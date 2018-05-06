@@ -15,7 +15,6 @@ import time
 
 
 class WEC(AbstractBaseSolution):
-    # TODO: Make sure index is lowered if body deleted is lower than next to be checked
     simulation_dt = 0.01
     simulation_steps = 2000
     initial_steps = 7000
@@ -75,6 +74,14 @@ class WEC(AbstractBaseSolution):
         self.lowtier_rule_perform(1, location=(0, 0), radius=2, stiffness=1000, damping=1000000)
         self.lowtier_rule_perform(1, location=(0, 2), radius=2, stiffness=1000, damping=1000000)
         self.lowtier_rule_perform(2, location=(0, 3), radius=2, stiffness=1000, damping=1000000)
+
+        #PELAMIS
+        # self.lowtier_rule_perform(2, location=(0, 0), radius=1, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(2, location=(1, 3), radius=1.6, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(2, location=(2, 2), radius=1.2, stiffness=1000, damping=1000000)
+
+        #POWERBUOY
+        # self.lowtier_rule_perform(2, location=(3, 3), radius=2, stiffness=1000, damping=1000000)
 
         self.applied_rules = []
 
@@ -1441,7 +1448,8 @@ class WEC(AbstractBaseSolution):
     def add_excitation_force(self):
         for body in self.bodies:
             if body['body'].position[1] >= self.sea_level - body['radius']:
-                amplitude = 42346*body["radius"]*2
+                # amplitude = 42346*body["radius"]*2
+                amplitude = 42346 * body["radius"] * 2 / 2
                 body["body"].apply_force_at_world_point(
                     (0, np.sqrt(2*0.01)*amplitude * np.sin((self.iter / 1000)*2*np.pi - 2*np.pi*body['body'].position[0]/100)),
                     body["body"].local_to_world(body["body"].center_of_gravity))
@@ -1499,7 +1507,7 @@ class WEC(AbstractBaseSolution):
 
                 body['last_velocity'] = body['body'].velocity
                 body['last_position'] = body['body'].position
-                if np.linalg.norm(body['last_velocity']) > 20:
+                if np.linalg.norm(body['last_velocity']) > 50:
                     self.stable_system = False
                     print("ITERATION UNSTABLE: BODY VELOCITY EXCEEDS MAXIMUM")
                     print('')
@@ -1572,6 +1580,15 @@ class WEC(AbstractBaseSolution):
     def lowtier_rule_select(self):
         num_rules = 8
         rule = random.randint(1, num_rules)
+
+        # TODO: THIS IS ONLY FOR THE TESTS WHICH OPTIMIZE PRE-DETERMINED TOPOLOGIES
+        # num_rules = 2
+        # rule = random.randint(0, num_rules-1)
+        # if rule == 0:
+        #     rule = 5
+        # elif rule == 1:
+        #     rule = 8
+
         print("LT Rule:", rule)
         return rule
 
