@@ -1,6 +1,9 @@
 import heuristic_bursts.agent
 import copy
 
+# TODO: DELETE THIS
+import wec.wec_visual
+
 
 class Team(object):
 
@@ -16,6 +19,8 @@ class Team(object):
         for i in range(self.options.number_of_agents):
             self.agent_list.append(heuristic_bursts.agent.Agent(self.options))
 
+        self.display = wec.wec_visual.wec_visual()
+
     def run(self):
         for i in range(1, self.options.number_of_iterations + 1):
             print("Iteration:", i)
@@ -26,6 +31,7 @@ class Team(object):
                 print("INTERACTION PERIOD")
                 print("")
                 self.interact()
+            self.display.display(self.agent_list[0].current_solution)
 
     def iterate(self):
         for agent in self.agent_list:

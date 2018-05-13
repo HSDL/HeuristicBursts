@@ -1181,7 +1181,6 @@ class WEC(AbstractBaseSolution):
                         resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2) + self.pto_size
                         self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
 
-        # TODO: FIGURE OUT METHOD FOR ENSURE NO BODIES OUT OF WATER IN THIS CASE
         bodies_out_of_water = False
         for body in self.bodies:
             if body['body'].position[1] - body['radius'] >= self.sea_level:
@@ -1436,6 +1435,7 @@ class WEC(AbstractBaseSolution):
 
             faddl = -displaced_mass * self.world.gravity
             body["body"].apply_force_at_world_point(faddl, body["body"].local_to_world(body["body"].center_of_gravity))
+            # print("Buoyant force: ", faddl)
 
     def voxelize_bodies(self):
         for body in self.bodies:
@@ -1453,6 +1453,7 @@ class WEC(AbstractBaseSolution):
                 body["body"].apply_force_at_world_point(
                     (0, np.sqrt(2*0.01)*amplitude * np.sin((self.iter / 1000)*2*np.pi - 2*np.pi*body['body'].position[0]/100)),
                     body["body"].local_to_world(body["body"].center_of_gravity))
+                # print("Excitation force: ", np.sqrt(2*0.01)*amplitude * np.sin((self.iter / 1000)*2*np.pi - 2*np.pi*body['body'].position[0]/100))
 
     def add_radiative_force(self):
         for body in self.bodies:
@@ -1467,6 +1468,7 @@ class WEC(AbstractBaseSolution):
             f = -0.5 * self.rho_w * Cd * A * v * np.linalg.norm(v)
 
             body["body"].apply_force_at_world_point(f, body["body"].local_to_world(body["body"].center_of_gravity))
+            # print("Viscous force: ", f)
 
     def pull_position_data(self):
         for i in range(len(self.bodies)):
@@ -1493,6 +1495,7 @@ class WEC(AbstractBaseSolution):
             # self.add_radiative_force()
             self.add_viscous_force()
 
+
             # Step the simulation forward
             self.world.step(self.simulation_dt)
 
@@ -1507,7 +1510,7 @@ class WEC(AbstractBaseSolution):
 
                 body['last_velocity'] = body['body'].velocity
                 body['last_position'] = body['body'].position
-                if np.linalg.norm(body['last_velocity']) > 50:
+                if np.linalg.norm(body['last_velocity']) > 20:
                     self.stable_system = False
                     print("ITERATION UNSTABLE: BODY VELOCITY EXCEEDS MAXIMUM")
                     print('')
@@ -1971,6 +1974,11 @@ class WEC(AbstractBaseSolution):
                 else:
                     validity = True
             if not validity:
+                break
+
+        for body in self.bodies:
+            if body['body'].position[1] - body['radius'] >= self.sea_level:
+                validity = False
                 break
         print("Solution Valid?:", validity)
         print("")
