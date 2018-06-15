@@ -15,9 +15,9 @@ import time
 
 
 class WEC(AbstractBaseSolution):
-    simulation_dt = 0.01
-    simulation_steps = 2000
-    initial_steps = 7000
+    simulation_dt = 0.005
+    simulation_steps = 4000
+    initial_steps = 2000
     error_bias = pow(1.0 - 0.1, 10.0)
     spectrum = sp.Spectrum('bretschneider', fp=0.5, Hm0=2)
     forces = ef.ExcitationForces()
@@ -27,7 +27,10 @@ class WEC(AbstractBaseSolution):
     gravity = -9.81
     number_of_metrics = 3
     sea_level = 0
-    pto_size = 1
+    wave_depth = 25
+    wave_width = 50
+    wave_period = 10
+    pto_size = 3
 
     def __init__(self):
         #
@@ -75,13 +78,17 @@ class WEC(AbstractBaseSolution):
         self.lowtier_rule_perform(1, location=(0, 2), radius=2, stiffness=1000, damping=1000000)
         self.lowtier_rule_perform(2, location=(0, 3), radius=2, stiffness=1000, damping=1000000)
 
+        # self.lowtier_rule_perform(1, location=(0, 0), radius=1.5, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(1, location=(1, 3), radius=2, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(2, location=(2, 2), radius=1.1, stiffness=1000, damping=1000000)
+
         #PELAMIS
-        # self.lowtier_rule_perform(2, location=(0, 0), radius=1, stiffness=1000, damping=1000000)
-        # self.lowtier_rule_perform(2, location=(1, 3), radius=1.6, stiffness=1000, damping=1000000)
-        # self.lowtier_rule_perform(2, location=(2, 2), radius=1.2, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(1, location=(0, 0), radius=1, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(1, location=(1, 0), radius=1, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(1, location=(2, 0), radius=1, stiffness=1000, damping=1000000)
 
         #POWERBUOY
-        # self.lowtier_rule_perform(2, location=(3, 3), radius=2, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(2, location=(0, 3), radius=2, stiffness=1000, damping=1000000)
 
         self.applied_rules = []
 
@@ -260,6 +267,7 @@ class WEC(AbstractBaseSolution):
 
     def repositioning(self, index, initial_body, new_body):
         self.bodies_shifted_upwards_out_of_water = False
+
         for relative_position in range(0, 4):
             self.reposition_branch(index, relative_position, initial_body, new_body)
 
@@ -293,21 +301,25 @@ class WEC(AbstractBaseSolution):
             test_body_pos = test_body['body'].position
             test_body_radius = test_body['radius']
             distance = np.sqrt((old_pos[0] - test_body_pos[0]) ** 2 + (old_pos[1] - test_body_pos[1]) ** 2)
-            if distance <= R1 + test_body_radius + self.pto_size + 0.05 and \
-                            distance >= R1 + test_body_radius + self.pto_size - 0.05:
-                if test_body_pos[1] == old_pos[1] and test_body_pos[0] > old_pos[0] and relative_position == 0:
+            if distance <= R1 + test_body_radius + self.pto_size + 0.005 and \
+                    distance >= R1 + test_body_radius + self.pto_size - 0.005:
+                if (test_body_pos[1] <= old_pos[1] + 0.005 and test_body_pos[1] >= old_pos[1] - 0.005) \
+                        and test_body_pos[0] > old_pos[0] and relative_position == 0:
                     bodies_to_check.append(i)
                     bodies_to_shift.append(i)
                     break
-                elif test_body_pos[0] == old_pos[0] and test_body_pos[1] > old_pos[1] and relative_position == 1:
+                elif (test_body_pos[0] <= old_pos[0] + 0.005 and test_body_pos[0] >= old_pos[0] - 0.005) \
+                        and test_body_pos[1] > old_pos[1] and relative_position == 1:
                     bodies_to_check.append(i)
                     bodies_to_shift.append(i)
                     break
-                elif test_body_pos[1] == old_pos[1] and test_body_pos[0] < old_pos[0] and relative_position == 2:
+                elif (test_body_pos[1] <= old_pos[1] + 0.005 and test_body_pos[1] >= old_pos[1] - 0.005) \
+                        and test_body_pos[0] < old_pos[0] and relative_position == 2:
                     bodies_to_check.append(i)
                     bodies_to_shift.append(i)
                     break
-                elif test_body_pos[0] == old_pos[0] and test_body_pos[1] < old_pos[1] and relative_position == 3:
+                elif (test_body_pos[0] <= old_pos[0] + 0.005 and test_body_pos[0] >= old_pos[0] - 0.005) \
+                        and test_body_pos[1] < old_pos[1] and relative_position == 3:
                     bodies_to_check.append(i)
                     bodies_to_shift.append(i)
                     break
@@ -1447,11 +1459,23 @@ class WEC(AbstractBaseSolution):
 
     def add_excitation_force(self):
         for body in self.bodies:
-            if body['body'].position[1] >= self.sea_level - body['radius']:
-                # amplitude = 42346*body["radius"]*2
-                amplitude = 42346 * body["radius"] * 2 / 2
+            x = body['body'].position[0]
+            y = body['body'].position[1]
+            r = body['radius']
+
+            if y >= self.sea_level - self.wave_depth - r and y - r <= self.sea_level:
+                amplitude = 42346*r*2
+                # amplitude = 42346 * r * 2 / 2
+
+                if y > self.sea_level:
+                    amplitude = amplitude
+                elif y < self.sea_level - self.wave_depth:
+                    amplitude = 0
+                else:
+                    amplitude = amplitude + (amplitude/self.wave_depth)*y
+
                 body["body"].apply_force_at_world_point(
-                    (0, np.sqrt(2*0.01)*amplitude * np.sin((self.iter / 1000)*2*np.pi - 2*np.pi*body['body'].position[0]/100)),
+                    (0, np.sqrt(2*0.01)*amplitude * np.sin((self.iter % (self.wave_period/self.simulation_dt))/(self.wave_period/self.simulation_dt)*2*np.pi - 2*np.pi*(x % self.wave_width)/self.wave_width)),
                     body["body"].local_to_world(body["body"].center_of_gravity))
                 # print("Excitation force: ", np.sqrt(2*0.01)*amplitude * np.sin((self.iter / 1000)*2*np.pi - 2*np.pi*body['body'].position[0]/100))
 
@@ -1510,7 +1534,7 @@ class WEC(AbstractBaseSolution):
 
                 body['last_velocity'] = body['body'].velocity
                 body['last_position'] = body['body'].position
-                if np.linalg.norm(body['last_velocity']) > 20:
+                if np.linalg.norm(body['last_velocity']) > 15:
                     self.stable_system = False
                     print("ITERATION UNSTABLE: BODY VELOCITY EXCEEDS MAXIMUM")
                     print('')
@@ -1999,28 +2023,28 @@ class WEC(AbstractBaseSolution):
                     test_body_pos = test_body['body'].position
                     test_body_radius = test_body['radius']
                     distance = np.sqrt((body_pos[0]-test_body_pos[0])**2 + (body_pos[1]-test_body_pos[1])**2)
-                    if distance <= body_radius + test_body_radius + self.pto_size + 0.05 and \
-                                    distance >= body_radius + test_body_radius + self.pto_size - 0.05:
+                    if distance <= body_radius + test_body_radius + self.pto_size + 0.005 and \
+                                    distance >= body_radius + test_body_radius + self.pto_size - 0.005:
                         if pos_to_check == 0:
-                            if test_body_pos[0] + 0.05 < body_pos[0] + distance:
+                            if test_body_pos[0] + 0.005 < body_pos[0] + distance:
                                 valid_location = True
                             else:
                                 valid_location = False
                                 break
                         elif pos_to_check == 1:
-                            if test_body_pos[1] + 0.05 < body_pos[1] + distance and body_pos[1] + body_radius < self.sea_level:
+                            if test_body_pos[1] + 0.005 < body_pos[1] + distance and body_pos[1] + body_radius < self.sea_level:
                                 valid_location = True
                             else:
                                 valid_location = False
                                 break
                         elif pos_to_check == 2:
-                            if test_body_pos[0] - 0.05 > body_pos[0] - distance:
+                            if test_body_pos[0] - 0.005 > body_pos[0] - distance:
                                 valid_location = True
                             else:
                                 valid_location = False
                                 break
                         elif pos_to_check == 3:
-                            if test_body_pos[1] - 0.05 > body_pos[1] - distance:
+                            if test_body_pos[1] - 0.005 > body_pos[1] - distance:
                                 valid_location = True
                             else:
                                 valid_location = False

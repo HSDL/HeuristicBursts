@@ -11,7 +11,7 @@ options = heuristic_bursts.options.Options()
 agent = heuristic_bursts.agent.Agent(options)
 display = wec.wec_visual.wec_visual()
 
-agent.tier_weights = [1.0, 0.0]
+agent.tier_weights = [0.0, 1.0]
 
 display.display(agent.current_solution)
 # time.sleep(3)

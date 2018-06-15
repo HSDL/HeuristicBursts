@@ -3,7 +3,7 @@ class Options(object):
     solution_class = ''
     number_of_agents = 3
     number_of_teams = 1
-    number_of_iterations = 1000
+    number_of_iterations = 500
     learning_style = 'multinomial'
     interaction_period = 10
     interaction_style = 'scheduled'

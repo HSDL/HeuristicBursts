@@ -12,15 +12,15 @@ def test_simulation_of_wec():
     display.display(device)
 
 
-    for i in range(0, len(device.bodies)):
-        print('Body: ', i, '; Position: ', device.bodies[i]['body'].position, 'Radius:',
-              device.bodies[i]['radius'])
-    print(' ')
-    print(' ')
+    # for i in range(0, len(device.bodies)):
+    #     print('Body: ', i, '; Position: ', device.bodies[i]['body'].position, 'Radius:',
+    #           device.bodies[i]['radius'])
+    # print(' ')
+    # print(' ')
 
-    display.display(device)
-    time.sleep(2)
-    display.wait_to_continue()
+    # display.display(device)
+    # time.sleep(2)
+    # display.wait_to_continue()
 
     # device.hightier_rule_perform(4)
     # device.lowtier_rule_perform(device.lowtier_rule_select())
@@ -69,14 +69,16 @@ def test_simulation_of_wec():
 
     display.display(device)
     time.sleep(2)
-    display.wait_to_continue()
+    # display.wait_to_continue()
 
     print(device.applied_rules)
 
-    device.display_visual = True
+    # device.display_visual = True
 
     device.evaluate()
     print(device.power)
     print(device.mass)
     print(device.power/device.mass)
+
+test_simulation_of_wec()
 
