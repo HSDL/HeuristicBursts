@@ -55,9 +55,12 @@ class wec_visual():
             pygame.draw.line(self.screen, self.olive, pos_a, pos_b, 3)
             pygame.draw.circle(self.screen, self.black, pos_a, 3)
             pygame.draw.circle(self.screen, self.black, pos_b, 3)
-            pygame.draw.circle(self.screen, self.olive,
+            pygame.draw.circle(self.screen, self.black,
                                (int((pos_a[0]+pos_b[0])/2), int((pos_a[1]+pos_b[1])/2)),
-                               device.pto_size*10-2)
+                               device.pto_size*4)
+            pygame.draw.circle(self.screen, self.olive,
+                               (int((pos_a[0] + pos_b[0]) / 2), int((pos_a[1] + pos_b[1]) / 2)),
+                               device.pto_size * 4 - 2)
         for linear_pto in device.linear_ptos_data:
             idxa = linear_pto['idxa']
             idxb = linear_pto['idxb']
@@ -70,9 +73,14 @@ class wec_visual():
             pygame.draw.line(self.screen, self.dark_orange, pos_a, pos_b, 3)
             pygame.draw.circle(self.screen, self.black, pos_a, 3)
             pygame.draw.circle(self.screen, self.black, pos_b, 3)
-            pygame.draw.circle(self.screen, self.dark_orange,
-                               (int((pos_a[0] + pos_b[0]) / 2), int((pos_a[1] + pos_b[1]) / 2)),
-                               device.pto_size * 10 - 2)
+            pygame.draw.rect(self.screen, self.black,
+                             (int((pos_a[0] + pos_b[0]) / 2) - device.pto_size*3,
+                              int((pos_a[1] + pos_b[1]) / 2)- device.pto_size*3,
+                              device.pto_size * 6, device.pto_size * 6))
+            pygame.draw.rect(self.screen, self.dark_orange,
+                             (int((pos_a[0] + pos_b[0]) / 2) - device.pto_size * 3 + 2,
+                              int((pos_a[1] + pos_b[1]) / 2) - device.pto_size * 3 + 2,
+                              device.pto_size * 6 - 4, device.pto_size * 6 - 4))
 
         pygame.draw.circle(self.screen, self.black, (100, 100), 52)
         pygame.draw.circle(self.screen, self.red, (100, 100), 50)

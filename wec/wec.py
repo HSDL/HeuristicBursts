@@ -15,10 +15,9 @@ import time
 
 
 class WEC(AbstractBaseSolution):
-    # TODO: Make sure index is lowered if body deleted is lower than next to be checked
-    simulation_dt = 0.01
-    simulation_steps = 2000
-    initial_steps = 7000
+    simulation_dt = 0.005
+    simulation_steps = 4000
+    initial_steps = 2000
     error_bias = pow(1.0 - 0.1, 10.0)
     spectrum = sp.Spectrum('bretschneider', fp=0.5, Hm0=2)
     forces = ef.ExcitationForces()
@@ -28,7 +27,10 @@ class WEC(AbstractBaseSolution):
     gravity = -9.81
     number_of_metrics = 3
     sea_level = 0
-    pto_size = 1
+    wave_depth = 25
+    wave_width = 50
+    wave_period = 10
+    pto_size = 3
 
     def __init__(self):
         #
@@ -75,6 +77,18 @@ class WEC(AbstractBaseSolution):
         self.lowtier_rule_perform(1, location=(0, 0), radius=2, stiffness=1000, damping=1000000)
         self.lowtier_rule_perform(1, location=(0, 2), radius=2, stiffness=1000, damping=1000000)
         self.lowtier_rule_perform(2, location=(0, 3), radius=2, stiffness=1000, damping=1000000)
+
+        # self.lowtier_rule_perform(1, location=(0, 0), radius=1.5, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(1, location=(1, 3), radius=2, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(2, location=(2, 2), radius=1.1, stiffness=1000, damping=1000000)
+
+        #PELAMIS
+        # self.lowtier_rule_perform(1, location=(0, 0), radius=1, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(1, location=(1, 0), radius=1, stiffness=1000, damping=1000000)
+        # self.lowtier_rule_perform(1, location=(2, 0), radius=1, stiffness=1000, damping=1000000)
+
+        #POWERBUOY
+        # self.lowtier_rule_perform(2, location=(0, 3), radius=2, stiffness=1000, damping=1000000)
 
         self.applied_rules = []
 
@@ -253,6 +267,7 @@ class WEC(AbstractBaseSolution):
 
     def repositioning(self, index, initial_body, new_body):
         self.bodies_shifted_upwards_out_of_water = False
+
         for relative_position in range(0, 4):
             self.reposition_branch(index, relative_position, initial_body, new_body)
 
@@ -286,21 +301,25 @@ class WEC(AbstractBaseSolution):
             test_body_pos = test_body['body'].position
             test_body_radius = test_body['radius']
             distance = np.sqrt((old_pos[0] - test_body_pos[0]) ** 2 + (old_pos[1] - test_body_pos[1]) ** 2)
-            if distance <= R1 + test_body_radius + self.pto_size + 0.05 and \
-                            distance >= R1 + test_body_radius + self.pto_size - 0.05:
-                if test_body_pos[1] == old_pos[1] and test_body_pos[0] > old_pos[0] and relative_position == 0:
+            if distance <= R1 + test_body_radius + self.pto_size + 0.005 and \
+                    distance >= R1 + test_body_radius + self.pto_size - 0.005:
+                if (test_body_pos[1] <= old_pos[1] + 0.005 and test_body_pos[1] >= old_pos[1] - 0.005) \
+                        and test_body_pos[0] > old_pos[0] and relative_position == 0:
                     bodies_to_check.append(i)
                     bodies_to_shift.append(i)
                     break
-                elif test_body_pos[0] == old_pos[0] and test_body_pos[1] > old_pos[1] and relative_position == 1:
+                elif (test_body_pos[0] <= old_pos[0] + 0.005 and test_body_pos[0] >= old_pos[0] - 0.005) \
+                        and test_body_pos[1] > old_pos[1] and relative_position == 1:
                     bodies_to_check.append(i)
                     bodies_to_shift.append(i)
                     break
-                elif test_body_pos[1] == old_pos[1] and test_body_pos[0] < old_pos[0] and relative_position == 2:
+                elif (test_body_pos[1] <= old_pos[1] + 0.005 and test_body_pos[1] >= old_pos[1] - 0.005) \
+                        and test_body_pos[0] < old_pos[0] and relative_position == 2:
                     bodies_to_check.append(i)
                     bodies_to_shift.append(i)
                     break
-                elif test_body_pos[0] == old_pos[0] and test_body_pos[1] < old_pos[1] and relative_position == 3:
+                elif (test_body_pos[0] <= old_pos[0] + 0.005 and test_body_pos[0] >= old_pos[0] - 0.005) \
+                        and test_body_pos[1] < old_pos[1] and relative_position == 3:
                     bodies_to_check.append(i)
                     bodies_to_shift.append(i)
                     break
@@ -559,7 +578,6 @@ class WEC(AbstractBaseSolution):
             c = np.sqrt(h * (2 * temp_body_b['radius'] - h))
             density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)) / \
                       ((4.0 / 3.0) * np.pi * np.power(temp_body_b['radius'], 3))
-        print(density)
         self.remove_body(idxa)
         self.add_body(temp_body_b['body_shape'], density, temp_body_a['body'].position,
                       radius=temp_body_b['radius'], length=temp_body_b['length'], angle_offset=temp_body_b['angle_offset'])
@@ -577,7 +595,6 @@ class WEC(AbstractBaseSolution):
             c = np.sqrt(h * (2 * temp_body_a['radius'] - h))
             density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h)) / \
                       ((4.0 / 3.0) * np.pi * np.power(temp_body_a['radius'], 3))
-        print(density)
         self.remove_body(idxb)
         self.add_body(temp_body_a['body_shape'], density, temp_body_b['body'].position,
                       radius=temp_body_a['radius'], length=temp_body_a['length'], angle_offset=temp_body_a['angle_offset'])
@@ -1091,9 +1108,6 @@ class WEC(AbstractBaseSolution):
                             (check_body_pos[0] == attachment_body_pos[0] and check_body_pos[1] < attachment_body_pos[1]):
                         attachment_body_index = check_body_index
 
-            # print("Attachment side: ", attachment_side)
-            # print("Attachment body: ", attachment_body_index)
-
             # Locate pattern body at side of pattern closest to attachment side
             # (i.e. right-most body if attachment is on left, and vice-versa)
             starting_pattern_body_index = 0
@@ -1127,16 +1141,27 @@ class WEC(AbstractBaseSolution):
             x_shift = attachment_body_pos[0] - starting_body_pos[0] + side_shift
             y_shift = attachment_body_pos[1] - starting_body_pos[1]
 
-            # print(x_shift)
-
             for index in range(0, len(pattern_bodies)):
                 temp_body = pattern_bodies[index]
                 temp_body_data = temp_body['body']
                 original_position = temp_body['original_position']
                 shape = 'sphere'
                 radius = temp_body_data['radius']
-                density = temp_body_data['density']
-                self.add_body(shape, density, (original_position[0] + x_shift, original_position[1] + y_shift),
+
+                new_x = original_position[0] + x_shift
+                new_y = original_position[1] + y_shift
+
+                if radius + new_y < self.sea_level:
+                    density = 1000
+                elif new_y - radius > self.sea_level:
+                    density = 350
+                else:
+                    h = radius - new_y + self.sea_level
+                    c = np.sqrt(h*(2*radius - h))
+                    density = (self.rho_w * (np.pi / 6) * h * (3 * c * c + h * h))/ \
+                              ((4.0 / 3.0) * np.pi * np.power(radius, 3))
+
+                self.add_body(shape, density, (new_x, new_y),
                               radius=radius)
 
             self.add_rotational_pto(attachment_body_index,
@@ -1168,9 +1193,27 @@ class WEC(AbstractBaseSolution):
                         resting_length = np.sqrt((pos_a[0] - pos_b[0]) ** 2 + (pos_a[1] - pos_b[1]) ** 2) + self.pto_size
                         self.add_constrained_linear_pto(idxa, idxb, resting_length, stiffness, damping)
 
-            # print("Starting pattern body: ", starting_pattern_body_index)
-            # for body in pattern_bodies:
-            #     print("Original position: ", body['original_position'])
+        bodies_out_of_water = False
+        for body in self.bodies:
+            if body['body'].position[1] - body['radius'] >= self.sea_level:
+                bodies_out_of_water = True
+                break
+
+        i = 0
+        while bodies_out_of_water and i < 50:
+            self.rule_check()
+            for deletable in self.deletable_bodies:
+                temp_body_check = self.bodies[deletable[0]]
+                if temp_body_check['body'].position[1] - temp_body_check['radius'] >= self.sea_level:
+                    self.remove_body_with_joint(deletable[0], deletable[1], deletable[2])
+                    break
+            bodies_out_of_water = False
+            for body in self.bodies:
+                if body['body'].position[1] - body['radius'] >= self.sea_level:
+                    bodies_out_of_water = True
+                    break
+            i += 1
+
         self.applied_rules.append('H5')
 
     def standardize(self, **kwargs):
@@ -1237,18 +1280,18 @@ class WEC(AbstractBaseSolution):
             for i in range(0, num_to_standardize):
                 body_index = bodies_to_standardize[i]
                 body = self.bodies[body_index]
-                body_density = body['density']
+                # body_density = body['density']
                 body_radius = body['radius']
                 body_length = body['length']
                 body_angle_offset = body['angle_offset']
 
-                density_diff = base_density - body_density
+                # density_diff = base_density - body_density
                 radius_diff = base_radius - body_radius
 
-                new_density = body_density + density_diff*standardization_rate
+                # new_density = body_density + density_diff*standardization_rate
                 new_radius = int(body_radius + radius_diff*standardization_rate)
 
-                self.change_body_density(body_index, new_density)
+                # self.change_body_density(body_index, new_density)
                 self.change_body_dimensions(body_index,
                                             radius=new_radius, length=body_length, angle_offset=body_angle_offset)
                 # print("Body: ", body_index, ", old radius: ", body_radius, ", new radius: ", new_radius)
@@ -1337,7 +1380,7 @@ class WEC(AbstractBaseSolution):
                 new_stiffness = pto_stiffness + stiffness_diff*standardization_rate
                 new_damping = pto_damping + damping_diff*standardization_rate
 
-                self.lowtier_rule_perform(9, joint_index=pto_index, joint_type=pto_type,
+                self.lowtier_rule_perform(8, joint_index=pto_index, joint_type=pto_type,
                                           stiffness=new_stiffness, damping=new_damping)
                 # Remove the last addition to list of applied rules to stop list from showing low-tier rule applied
                 del self.applied_rules[-1]
@@ -1404,6 +1447,7 @@ class WEC(AbstractBaseSolution):
 
             faddl = -displaced_mass * self.world.gravity
             body["body"].apply_force_at_world_point(faddl, body["body"].local_to_world(body["body"].center_of_gravity))
+            # print("Buoyant force: ", faddl)
 
     def voxelize_bodies(self):
         for body in self.bodies:
@@ -1415,11 +1459,25 @@ class WEC(AbstractBaseSolution):
 
     def add_excitation_force(self):
         for body in self.bodies:
-            if body['body'].position[1] >= self.sea_level - body['radius']:
-                amplitude = 42346*body["radius"]*2
+            x = body['body'].position[0]
+            y = body['body'].position[1]
+            r = body['radius']
+
+            if y >= self.sea_level - self.wave_depth - r and y - r <= self.sea_level:
+                amplitude = 42346*r*2
+                # amplitude = 42346 * r * 2 / 2
+
+                if y > self.sea_level:
+                    amplitude = amplitude
+                elif y < self.sea_level - self.wave_depth:
+                    amplitude = 0
+                else:
+                    amplitude = amplitude + (amplitude/self.wave_depth)*y
+
                 body["body"].apply_force_at_world_point(
-                    (0, np.sqrt(2*0.01)*amplitude * np.sin((self.iter / 1000)*2*np.pi - 2*np.pi*body['body'].position[0]/100)),
+                    (0, np.sqrt(2*0.01)*amplitude * np.sin((self.iter % (self.wave_period/self.simulation_dt))/(self.wave_period/self.simulation_dt)*2*np.pi - 2*np.pi*(x % self.wave_width)/self.wave_width)),
                     body["body"].local_to_world(body["body"].center_of_gravity))
+                # print("Excitation force: ", np.sqrt(2*0.01)*amplitude * np.sin((self.iter / 1000)*2*np.pi - 2*np.pi*body['body'].position[0]/100))
 
     def add_radiative_force(self):
         for body in self.bodies:
@@ -1434,6 +1492,7 @@ class WEC(AbstractBaseSolution):
             f = -0.5 * self.rho_w * Cd * A * v * np.linalg.norm(v)
 
             body["body"].apply_force_at_world_point(f, body["body"].local_to_world(body["body"].center_of_gravity))
+            # print("Viscous force: ", f)
 
     def pull_position_data(self):
         for i in range(len(self.bodies)):
@@ -1460,6 +1519,7 @@ class WEC(AbstractBaseSolution):
             # self.add_radiative_force()
             self.add_viscous_force()
 
+
             # Step the simulation forward
             self.world.step(self.simulation_dt)
 
@@ -1474,7 +1534,7 @@ class WEC(AbstractBaseSolution):
 
                 body['last_velocity'] = body['body'].velocity
                 body['last_position'] = body['body'].position
-                if np.linalg.norm(body['last_velocity']) > 20:
+                if np.linalg.norm(body['last_velocity']) > 15:
                     self.stable_system = False
                     print("ITERATION UNSTABLE: BODY VELOCITY EXCEEDS MAXIMUM")
                     print('')
@@ -1547,6 +1607,15 @@ class WEC(AbstractBaseSolution):
     def lowtier_rule_select(self):
         num_rules = 8
         rule = random.randint(1, num_rules)
+
+        # TODO: THIS IS ONLY FOR THE TESTS WHICH OPTIMIZE PRE-DETERMINED TOPOLOGIES
+        # num_rules = 2
+        # rule = random.randint(0, num_rules-1)
+        # if rule == 0:
+        #     rule = 5
+        # elif rule == 1:
+        #     rule = 8
+
         print("LT Rule:", rule)
         return rule
 
@@ -1930,7 +1999,13 @@ class WEC(AbstractBaseSolution):
                     validity = True
             if not validity:
                 break
+
+        for body in self.bodies:
+            if body['body'].position[1] - body['radius'] >= self.sea_level:
+                validity = False
+                break
         print("Solution Valid?:", validity)
+        print("")
         return validity
 
     # Search through design to check where bodies can be added and where bodies can be deleted
@@ -1948,28 +2023,28 @@ class WEC(AbstractBaseSolution):
                     test_body_pos = test_body['body'].position
                     test_body_radius = test_body['radius']
                     distance = np.sqrt((body_pos[0]-test_body_pos[0])**2 + (body_pos[1]-test_body_pos[1])**2)
-                    if distance <= body_radius + test_body_radius + self.pto_size + 0.05 and \
-                                    distance >= body_radius + test_body_radius + self.pto_size - 0.05:
+                    if distance <= body_radius + test_body_radius + self.pto_size + 0.005 and \
+                                    distance >= body_radius + test_body_radius + self.pto_size - 0.005:
                         if pos_to_check == 0:
-                            if test_body_pos[0] + 0.05 < body_pos[0] + distance:
+                            if test_body_pos[0] + 0.005 < body_pos[0] + distance:
                                 valid_location = True
                             else:
                                 valid_location = False
                                 break
                         elif pos_to_check == 1:
-                            if test_body_pos[1] + 0.05 < body_pos[1] + distance and body_pos[1] + body_radius < self.sea_level:
+                            if test_body_pos[1] + 0.005 < body_pos[1] + distance and body_pos[1] + body_radius < self.sea_level:
                                 valid_location = True
                             else:
                                 valid_location = False
                                 break
                         elif pos_to_check == 2:
-                            if test_body_pos[0] - 0.05 > body_pos[0] - distance:
+                            if test_body_pos[0] - 0.005 > body_pos[0] - distance:
                                 valid_location = True
                             else:
                                 valid_location = False
                                 break
                         elif pos_to_check == 3:
-                            if test_body_pos[1] - 0.05 > body_pos[1] - distance:
+                            if test_body_pos[1] - 0.005 > body_pos[1] - distance:
                                 valid_location = True
                             else:
                                 valid_location = False
