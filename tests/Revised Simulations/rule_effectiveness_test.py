@@ -3,189 +3,376 @@ import numpy
 
 import matplotlib
 import matplotlib.pyplot as plt
+from scipy import stats
 
-num_iter = 400
-max_allowed_qual = 10000
+num_iter = 500
+num_reps = 75
+max_allowed_qual = 5000
 
+file = 'probabilistic_selection_test_500_iterations.csv'
 
-with open('lower_tier_only_400_iterations.csv', 'r') as sim_data_file:
+all_repetitions_data = []
+
+num_lowtier_rules = 8
+num_hightier_rules = 5
+
+chunk_size = 100
+
+rule_applications_a = []
+rule_acceptance_a = []
+rule_effectiveness_a = []
+rule_selection_chance_a = []
+rule_proportions_a = []
+
+for i in range(0, int(num_iter/chunk_size)):
+    rule_applications_a.append(numpy.zeros(num_lowtier_rules+num_hightier_rules))
+    rule_acceptance_a.append(numpy.zeros(num_lowtier_rules+num_hightier_rules))
+    rule_effectiveness_a.append(numpy.zeros(num_lowtier_rules+num_hightier_rules))
+
+with open(file, 'r') as sim_data_file:
     csv_reader = csv.DictReader(sim_data_file)
 
     valid_reps = []
     for row in csv_reader:
-        if int(row['iteration']) == num_iter and float(row['current solution quality']) < max_allowed_qual:
+        if int(row['iteration']) == num_iter and float(row['current solution quality']) < max_allowed_qual and len(valid_reps) < num_reps:
             valid_reps.append(row['repetition'])
 
     print('')
     print(valid_reps)
+    print('')
+    print(len(valid_reps))
     print('')
 
     sim_data_file.seek(0)
 
     next(csv_reader)
 
-    rule_qual = []
+    data_list = list(csv_reader)
+    current_data_list_index = 0
 
-    for i in range(0, 8):
-        rule_qual.append([])
+    for repetition_index in range(0, len(valid_reps)):
+        current_rep_num = valid_reps[repetition_index]
+        current_rep_data = []
 
-    for row in csv_reader:
-        if row['repetition'] in valid_reps and int(row['rule acceptance']) == 1 and int(row['iteration']):
-            qual_diff = float(row['quality after rule']) - float(row['quality before rule'])
-            rule_qual[int(row['rule number'])-1].append(qual_diff)
+        for i in range(0, num_iter):
+            current_rep_data.append([])
 
-    avg_rule_qual = []
+        for data_index in range(current_data_list_index, len(data_list)):
+            row = data_list[data_index]
+            current_data_list_index += 1
+            if row['repetition'] == current_rep_num:
+                rep = int(current_rep_num)
+                iter = int(row['iteration'])
+                tier = row['rule tier']
+                rule = int(row['rule number'])
+                acceptance = int(row['rule acceptance'])
 
-    for rule in rule_qual:
-        avg_rule_qual.append(numpy.mean(rule))
+                quality_before = float(row['quality before rule'])
+                quality_after = float(row['quality after rule'])
+                quality_change = quality_after - quality_before
 
-    print(avg_rule_qual)
+                current_rep_data[int(row['iteration'])-1].append({'rep': rep,
+                                                                  'iter': iter,
+                                                                  'tier': tier,
+                                                                  'rule': rule,
+                                                                  'acceptance': acceptance,
+                                                                  'quality_change': quality_change})
 
-plt.figure(1)
-plt.subplot(111)
-rule_list = ['L1: Add rotational body', 'L2: Add linear body', 'L3: Remove body with joint', 'L4: Change joint type',
-             'L5: Change body dimensions', 'L6: Relocate body with joint', 'L7: Swap bodies',
-             'L8: Change joint coefficients']
-plt.xlabel('Average Solution Quality Improvement [W/kg]')
-plt.yticks(range(len(avg_rule_qual)), rule_list)
-plt.title('Average Rule Effectiveness Using Only Lower-Tier Rules (Rules Accepted in Design)(400 Iterations per Agent)(All Iterations)')
-plt.grid(axis='x', color='r', linestyle='-', linewidth=1)
-plt.xlim((0, 50))
-plt.barh(range(len(avg_rule_qual)), avg_rule_qual, 1/1.5, align='center')
-plt.show()
+            elif row['repetition'] in valid_reps:
+                current_data_list_index -= 1
+                break
 
-with open('lower_tier_only_400_iterations.csv', 'r') as sim_data_file:
+        all_repetitions_data.append(current_rep_data)
+
+for i in range(0, len(all_repetitions_data)):
+    for j in range(0, len(all_repetitions_data[i])):
+        iteration = all_repetitions_data[i][j][0]
+        chunk = int((iteration['iter'] - 1) / chunk_size)
+
+        if iteration['tier'] == 'low':
+            rule_index = iteration['rule'] - 1
+        elif iteration['tier'] == 'high':
+            rule_index = iteration['rule'] - 2 + num_lowtier_rules
+
+        rule_applications_a[chunk][rule_index] += 1
+
+        if iteration['acceptance'] == 1:
+            rule_acceptance_a[chunk][rule_index] += 1
+
+rule_effectiveness_a = numpy.divide(rule_acceptance_a, rule_applications_a)
+rule_selection_chance_a = numpy.divide(rule_applications_a, len(all_repetitions_data)*chunk_size)
+
+for i in range(0, len(rule_acceptance_a)):
+    total_accepted = sum(rule_acceptance_a[i])
+    rule_proportions_a.append(numpy.divide(rule_acceptance_a[i], total_accepted))
+
+error_a = []
+
+for chunk in rule_proportions_a:
+    error_a.append(stats.sem(chunk))
+
+# print(rule_applications_a)
+# print(rule_acceptance_a)
+# print(rule_effectiveness_a)
+# print(rule_selection_chance_a)
+# print(rule_proportions_a)
+# print('')
+
+file = 'probabilistic_selection_test_500_iterations.csv'
+
+all_repetitions_data = []
+
+rule_applications_b = []
+rule_acceptance_b = []
+rule_effectiveness_b = []
+rule_selection_chance_b = []
+rule_proportions_b = []
+
+for i in range(0, int(num_iter/chunk_size)):
+    rule_applications_b.append(numpy.zeros(num_lowtier_rules+num_hightier_rules))
+    rule_acceptance_b.append(numpy.zeros(num_lowtier_rules+num_hightier_rules))
+    rule_effectiveness_b.append(numpy.zeros(num_lowtier_rules+num_hightier_rules))
+
+with open(file, 'r') as sim_data_file:
     csv_reader = csv.DictReader(sim_data_file)
 
     valid_reps = []
     for row in csv_reader:
-        if int(row['iteration']) == num_iter and float(row['current solution quality']) < max_allowed_qual:
+        if int(row['iteration']) == num_iter and float(row['current solution quality']) < max_allowed_qual and len(valid_reps) < num_reps:
             valid_reps.append(row['repetition'])
 
     print('')
     print(valid_reps)
+    print('')
+    print(len(valid_reps))
     print('')
 
     sim_data_file.seek(0)
 
     next(csv_reader)
 
-    rule_qual = []
+    data_list = list(csv_reader)
+    current_data_list_index = 0
 
-    for i in range(0, 8):
-        rule_qual.append([])
+    for repetition_index in range(0, len(valid_reps)):
+        current_rep_num = valid_reps[repetition_index]
+        current_rep_data = []
 
-    for row in csv_reader:
-        if row['repetition'] in valid_reps and int(row['rule acceptance']) == 1 and int(row['iteration']) <= 200:
-            qual_diff = float(row['quality after rule']) - float(row['quality before rule'])
-            rule_qual[int(row['rule number'])-1].append(qual_diff)
+        for i in range(0, num_iter):
+            current_rep_data.append([])
 
-    avg_rule_qual = []
+        for data_index in range(current_data_list_index, len(data_list)):
+            row = data_list[data_index]
+            current_data_list_index += 1
+            if row['repetition'] == current_rep_num:
+                rep = int(current_rep_num)
+                iter = int(row['iteration'])
+                tier = row['rule tier']
+                rule = int(row['rule number'])
+                acceptance = int(row['rule acceptance'])
 
-    for rule in rule_qual:
-        avg_rule_qual.append(numpy.mean(rule))
+                quality_before = float(row['quality before rule'])
+                quality_after = float(row['quality after rule'])
+                quality_change = quality_after - quality_before
 
-    print(avg_rule_qual)
+                current_rep_data[int(row['iteration'])-1].append({'rep': rep,
+                                                                  'iter': iter,
+                                                                  'tier': tier,
+                                                                  'rule': rule,
+                                                                  'acceptance': acceptance,
+                                                                  'quality_change': quality_change})
 
-plt.figure(1)
-plt.subplot(111)
-rule_list = ['L1: Add rotational body', 'L2: Add linear body', 'L3: Remove body with joint', 'L4: Change joint type',
-             'L5: Change body dimensions', 'L6: Relocate body with joint', 'L7: Swap bodies',
-             'L8: Change joint coefficients']
-plt.xlabel('Average Solution Quality Improvement [W/kg]')
-plt.yticks(range(len(avg_rule_qual)), rule_list)
-plt.title('Average Rule Effectiveness Using Only Lower-Tier Rules (Rules Accepted in Design)(400 Iterations per Agent)(First 200 Iterations)')
-plt.grid(axis='x', color='r', linestyle='-', linewidth=1)
-plt.xlim((0, 50))
-plt.barh(range(len(avg_rule_qual)), avg_rule_qual, 1/1.5, align='center')
+            elif row['repetition'] in valid_reps:
+                current_data_list_index -= 1
+                break
+
+        all_repetitions_data.append(current_rep_data)
+
+for i in range(0, len(all_repetitions_data)):
+    for j in range(0, len(all_repetitions_data[i])):
+        iteration = all_repetitions_data[i][j][0]
+        chunk = int((iteration['iter'] - 1) / chunk_size)
+
+        if iteration['tier'] == 'low':
+            rule_index = iteration['rule'] - 1
+        elif iteration['tier'] == 'high':
+            rule_index = iteration['rule'] - 2 + num_lowtier_rules
+
+        rule_applications_b[chunk][rule_index] += 1
+
+        if iteration['acceptance'] == 1:
+            rule_acceptance_b[chunk][rule_index] += 1
+
+rule_effectiveness_b = numpy.divide(rule_acceptance_b, rule_applications_b)
+rule_selection_chance_b = numpy.divide(rule_applications_b, len(all_repetitions_data)*chunk_size)
+
+for i in range(0, len(rule_acceptance_b)):
+    total_accepted = sum(rule_acceptance_b[i])
+    rule_proportions_b.append(numpy.divide(rule_acceptance_b[i], total_accepted))
+
+error_b = []
+
+for chunk in rule_proportions_b:
+    error_b.append(stats.sem(chunk))
+
+# print(rule_applications_b)
+# print(rule_acceptance_b)
+# print(rule_effectiveness_b)
+
+#######################################################################################################################
+#######################################################################################################################
+
+chunk_labels = ('1', '2', '3', '4', '5')
+y_pos = numpy.arange(len(chunk_labels))
+bar_width = 0.35
+
+# for rule in range(0, num_lowtier_rules + num_hightier_rules):
+#     effectiveness_a = []
+#     effectiveness_b = []
+#     for chunk in rule_proportions_a:
+#         effectiveness_a.append(chunk[rule])
+#     for chunk in rule_proportions_b:
+#         effectiveness_b.append(chunk[rule])
+#     plt.bar(y_pos, effectiveness_a, bar_width, color='g', align='center', alpha=0.5, label='Random Selection')
+#     # plt.bar(y_pos+bar_width, effectiveness_b, bar_width, color='c', align='center', alpha=0.5, label='Probabilistic Selection')
+#     # plt.errorbar(y_pos, effectiveness_a, yerr=error_a, color='g', alpha=0.5, fmt='o')
+#     # plt.errorbar(y_pos + bar_width, effectiveness_b, yerr=error_b, color='c', alpha=0.5, fmt='o')
+#     plt.xticks(y_pos, chunk_labels)
+#     plt.ylim(0, 0.75)
+#     plt.grid()
+#     plt.xlabel('Iteration Chunk (Every 100 Iter.)')
+#     plt.ylabel('Acceptance Rate of Applied Rule')
+#     plt.legend(loc=1)
+#
+    # if rule < 8:
+    #     plt.title('Lower-Tier Rule: ' + str(rule+1))
+    # else:
+    #     plt.title('Higher-Tier Rule: ' + str(rule-7))
+#     print(effectiveness_a)
+#     print(effectiveness_b)
+#     plt.show()
+
+all_rule_proportions = []
+
+for rule in range(0, num_lowtier_rules + num_hightier_rules):
+    proportion = []
+    for chunk in rule_proportions_a:
+        proportion.append(chunk[rule])
+    all_rule_proportions.append(proportion)
+
+print(all_rule_proportions)
+
+colors = [(0.8, 0, 0), (0, 0.8, 0), (0, 0, 0.8), (0.8, 0.8, 0), (0.8, 0, 0.8), (0, 0.8, 0.8), (0.8, 0.4, 0.4), (0.4, 0.8, 0.4),
+          (0.4, 0.4, 0.8), (0.8, 0.2, 0.4), (0.2, 0.2, 0), (0.8, 1.0, 0.4), (0.9, 0.6, 0.2)]
+last_bottom = numpy.zeros(len(rule_proportions_a))
+
+for rule_index in range(0, len(all_rule_proportions)):
+    rule = all_rule_proportions[rule_index]
+    if rule_index < 8:
+        rule_name = "LT Rule: "+ str(rule_index+1)
+    else:
+        rule_name = "HT Rule: "+str(rule_index-7)
+    plt.bar(y_pos, rule, bar_width, color=colors[rule_index], bottom=last_bottom, align='center', alpha=0.5, label=rule_name)
+    plt.xticks(y_pos, chunk_labels)
+    plt.ylim(0, 1.0)
+    plt.xlabel('Iteration Chunk (Every 100 Iter.)')
+    plt.ylabel('Proportion')
+    plt.title('Proportion of Each Rule Within All Accepted Rules per Chunk (Random Rule Selection)')
+    plt.legend(loc=1)
+
+    last_bottom += rule
+
+plt.grid()
 plt.show()
 
-with open('lower_tier_only_400_iterations.csv', 'r') as sim_data_file:
-    csv_reader = csv.DictReader(sim_data_file)
+#######################################################################################################################
+#######################################################################################################################
 
-    valid_reps = []
-    for row in csv_reader:
-        if int(row['iteration']) == num_iter and float(row['current solution quality']) < max_allowed_qual:
-            valid_reps.append(row['repetition'])
+lumped_proportions = numpy.zeros(5)
+best_rules = [4, 6, 7, 10, 12]
 
-    print('')
-    print(valid_reps)
-    print('')
+for rule_index in range(0, len(all_rule_proportions)):
+    if rule_index not in best_rules:
+        for chunk_index in range(len(rule_proportions_a)):
+            lumped_proportions[chunk_index] += all_rule_proportions[rule_index][chunk_index]
+    print(lumped_proportions)
 
-    sim_data_file.seek(0)
+lumped_and_best_proportions = []
+lumped_and_best_proportions.append(lumped_proportions)
 
-    next(csv_reader)
+for index in best_rules:
+    lumped_and_best_proportions.append(all_rule_proportions[index])
 
-    rule_qual = []
+colors = [(0.5, 0.4, 0.2), (0, 0.6, 0), (0, 0.2, 0.5), (0.7, 0.2, 0.1), (0.4, 0.8, 0.2), (0.8, 0.5, 0)]
+last_bottom = numpy.zeros(len(rule_proportions_a))
 
-    for i in range(0, 8):
-        rule_qual.append([])
+for rule_index in range(0, len(lumped_and_best_proportions)):
+    rule = lumped_and_best_proportions[rule_index]
+    if rule_index == 0:
+        rule_name = "OTHER"
+    elif rule_index == 1:
+        rule_name = 'LT Rule 5'
+    elif rule_index == 2:
+        rule_name = 'LT Rule 7'
+    elif rule_index == 3:
+        rule_name = 'LT Rule 8'
+    elif rule_index == 4:
+        rule_name = 'HT Rule 3'
+    elif rule_index == 5:
+        rule_name = 'HT Rule 5'
+    plt.bar(y_pos, rule, bar_width, color=colors[rule_index], bottom=last_bottom, align='center', alpha=0.5,
+            label=rule_name)
+    plt.xticks(y_pos, chunk_labels)
+    plt.ylim(0, 1.0)
+    plt.xlabel('Iteration Chunk (Every 100 Iter.)')
+    plt.ylabel('Proportion')
+    plt.title('Proportion of Each Rule Within All Accepted Rules per Chunk (Probabilistic Rule Selection)')
+    plt.legend(loc=1)
 
-    for row in csv_reader:
-        if row['repetition'] in valid_reps and int(row['rule acceptance']) == 1 and int(row['iteration']) > 200:
-            qual_diff = float(row['quality after rule']) - float(row['quality before rule'])
-            rule_qual[int(row['rule number'])-1].append(qual_diff)
+    last_bottom += rule
 
-    avg_rule_qual = []
-
-    for rule in rule_qual:
-        avg_rule_qual.append(numpy.mean(rule))
-
-    print(avg_rule_qual)
-
-plt.figure(1)
-plt.subplot(111)
-rule_list = ['L1: Add rotational body', 'L2: Add linear body', 'L3: Remove body with joint', 'L4: Change joint type',
-             'L5: Change body dimensions', 'L6: Relocate body with joint', 'L7: Swap bodies',
-             'L8: Change joint coefficients']
-plt.xlabel('Average Solution Quality Improvement [W/kg]')
-plt.yticks(range(len(avg_rule_qual)), rule_list)
-plt.title('Average Rule Effectiveness Using Only Lower-Tier Rules (Rules Accepted in Design)(400 Iterations per Agent)(Second 200 Iterations)')
-plt.grid(axis='x', color='r', linestyle='-', linewidth=1)
-plt.xlim((0, 50))
-plt.barh(range(len(avg_rule_qual)), avg_rule_qual, 1/1.5, align='center')
+plt.grid()
 plt.show()
 
-# with open('lower_tier_only_400_iterations.csv', 'r') as sim_data_file:
-#     csv_reader = csv.DictReader(sim_data_file)
-#
-#     valid_reps = []
-#     for row in csv_reader:
-#         if int(row['iteration']) == num_iter and float(row['current solution quality']) < max_allowed_qual:
-#             valid_reps.append(row['repetition'])
-#
-#     print('')
-#     print(valid_reps)
-#     print('')
-#
-#     sim_data_file.seek(0)
-#
-#     next(csv_reader)
-#
-#     rule_qual = []
-#
-#     for i in range(0, 8):
-#         rule_qual.append([])
-#
-#     for row in csv_reader:
-#         if row['repetition'] in valid_reps:
-#             qual_diff = float(row['quality after rule']) - float(row['quality before rule'])
-#             rule_qual[int(row['rule number'])-1].append(qual_diff)
-#
-#     avg_rule_qual = []
-#
-#     for rule in rule_qual:
-#         avg_rule_qual.append(numpy.mean(rule))
-#
-#     print(avg_rule_qual)
-#
-# plt.figure(1)
-# plt.subplot(111)
-# rule_list = ['L1: Add rotational body', 'L2: Add linear body', 'L3: Remove body with joint', 'L4: Change joint type',
-#              'L5: Change body dimensions', 'L6: Relocate body with joint', 'L7: Swap bodies',
-#              'L8: Change joint coefficients']
-# plt.xlabel('Average Solution Quality Improvement [W/kg]')
-# plt.yticks(range(len(avg_rule_qual)), rule_list)
-# plt.title('Average Rule Effectiveness Using Only Lower-Tier Rules (Rules Accepted in Design)(300 Iterations per Agent)')
-# plt.barh(range(len(avg_rule_qual)), avg_rule_qual, 1/1.5, align='center')
-# plt.show()
+#######################################################################################################################
+#######################################################################################################################
+
+lower_tier_proportions = numpy.zeros(5)
+higher_tier_proportions = numpy.zeros(5)
+
+for rule_index in range(len(all_rule_proportions)):
+    if rule_index < 8:
+        for chunk_index in range(len(all_rule_proportions[rule_index])):
+            lower_tier_proportions[chunk_index] += all_rule_proportions[rule_index][chunk_index]
+        print(lower_tier_proportions)
+    elif rule_index >= 8:
+        for chunk_index in range(len(all_rule_proportions[rule_index])):
+            higher_tier_proportions[chunk_index] += all_rule_proportions[rule_index][chunk_index]
+        print(higher_tier_proportions)
+
+combined_tiers_proportions = []
+combined_tiers_proportions.append(lower_tier_proportions)
+combined_tiers_proportions.append(higher_tier_proportions)
+
+colors = [(0.8, 0.8, 0), (0, 0.2, 0.8)]
+
+last_bottom = numpy.zeros(len(rule_proportions_a))
+
+for tier_index in range(len(combined_tiers_proportions)):
+    tier = combined_tiers_proportions[tier_index]
+    if tier_index == 0:
+        tier_name = "Lower-Tier"
+    elif tier_index == 1:
+        tier_name = "Higher-Tier"
+    plt.bar(y_pos, tier, bar_width, color=colors[tier_index], bottom=last_bottom, align='center', alpha=0.5, label=tier_name)
+    plt.xticks(y_pos, chunk_labels)
+    plt.ylim(0, 1.0)
+    plt.xlabel('Iteration Chunk (Every 100 Iter.)')
+    plt.ylabel('Proportion')
+    plt.title('Proportion of Each Rule Tier Within All Accepted Rules per Chunk (Probabilistic Rule Selection)')
+    plt.legend(loc=1)
+
+    last_bottom += tier
+
+plt.grid()
+plt.show()

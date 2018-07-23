@@ -80,5 +80,5 @@ def test_simulation_of_wec():
     print(device.mass)
     print(device.power/device.mass)
 
-test_simulation_of_wec()
 
+test_simulation_of_wec()

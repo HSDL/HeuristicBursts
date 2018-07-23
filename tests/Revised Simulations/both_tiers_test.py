@@ -56,4 +56,4 @@ for sim_num in range(0, 50):
             iteration_data[0] = last_rep + 1
             csv_writer.writerow(iteration_data)
 
-    team.display.wait_to_continue()
+    # team.display.wait_to_continue()

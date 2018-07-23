@@ -39,10 +39,10 @@ class Agent(object):
                                                   heuristic_bursts.solution.Solution.number_of_highertier_operations])
 
         # Instantiate weights for different rule tiers
-        self.rule = 0
-        self.last_rule = 0
-        self.preferred_rule_tier = 'low'
-        self.last_tier = 'low'
+        self.rule = 2
+        self.last_rule = 2
+        self.preferred_rule_tier = 'high'
+        self.last_tier = 'high'
         self.apply_lowtier_rule = False
         self.apply_hightier_rule = False
         self.tiers = ['low', 'high']
@@ -59,8 +59,12 @@ class Agent(object):
         self.past_candidates_results = []
         self.candidate_variance = 1
 
+        # Initialize matrices for previous-tier weighted rule selection
+        self.previous_tier_preferred_k = 0.1
+        self.previous_tier_preferred_selection_weights = [[0.9, 0.1], [0.1, 0.9]]
+
         # Initialize Markov matrices
-        self.markov_k = 0.1
+        self.markov_k = 0.05
         self.num_lowtier_rules = 8
         self.num_hightier_rules = 5
         self.markov_matrix = numpy.ones((self.num_lowtier_rules + self.num_hightier_rules, self.num_lowtier_rules + self.num_hightier_rules))
@@ -68,7 +72,7 @@ class Agent(object):
         self.normalize_markov()
 
         # Initialize Probabilistic Rule Selection matrices
-        self.probability_k = 0.1
+        self.probability_k = 0.05
         self.rule_probabilities = numpy.ones(self.num_lowtier_rules + self.num_hightier_rules)
         self.rule_probabilities_normal = numpy.ones(self.num_lowtier_rules + self.num_hightier_rules)
         self.normalize_rule_probabilities()
@@ -90,6 +94,7 @@ class Agent(object):
         # self.markov_rule_select()
         # self.probabilistic_rule_select()
         self.random_rule_select()
+        # self.previous_tier_preferred_rule_select()
 
         # Depending which tier the agent prefers in this iteration, implement one rule from that tier
         if self.apply_lowtier_rule:
@@ -125,7 +130,7 @@ class Agent(object):
                                      self.previous_solution_quality, self.candidate_solution_quality,
                                      self.current_solution_quality, self.rule_accepted,
                                      self.tier_weights[0], self.tier_weights[1], self.error,
-                                     numpy.copy(self.markov_matrix)])
+                                     numpy.copy(self.previous_tier_preferred_selection_weights)])
 
         self.iteration_count += 1
         self.tier_weights = (self.tier_weights[0] + self.tier_weight_change[0],
@@ -173,6 +178,8 @@ class Agent(object):
 
         # Update Markov matrix
         self.update_markov(d_quality)
+
+        # Update last rule and rule tier
         self.last_rule = self.rule
         self.last_tier = self.preferred_rule_tier
 
@@ -221,6 +228,24 @@ class Agent(object):
     def random_rule_select(self):
         # Probabilistically select rule tier based on preferences
         self.preferred_rule_tier = str(numpy.random.choice(self.tiers, p=self.tier_weights))
+
+        if self.preferred_rule_tier == 'low':
+            self.apply_lowtier_rule = True
+        elif self.preferred_rule_tier == 'high':
+            self.apply_hightier_rule = True
+
+        # Depending which tier the agent prefers in this iteration, implement one rule from that tier
+        if self.apply_lowtier_rule:
+            self.rule = self.candidate_solution.lowtier_rule_select()
+        elif self.apply_hightier_rule:
+            self.rule = self.candidate_solution.hightier_rule_select()
+
+    def previous_tier_preferred_rule_select(self):
+        # Choose next rule tier based on previous rule tier. Selection is weighted to prefer last tier
+        if self.last_tier == 'low':
+            self.preferred_rule_tier = str(numpy.random.choice(self.tiers, p=self.previous_tier_preferred_selection_weights[0]))
+        elif self.last_tier == 'high':
+            self.preferred_rule_tier = str(numpy.random.choice(self.tiers, p=self.previous_tier_preferred_selection_weights[1]))
 
         if self.preferred_rule_tier == 'low':
             self.apply_lowtier_rule = True

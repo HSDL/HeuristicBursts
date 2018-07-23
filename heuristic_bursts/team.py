@@ -26,7 +26,7 @@ class Team(object):
             print("Iteration:", i)
             print("")
             self.iterate()
-            print(self.agent_list[0].rule_probabilities)
+            # print(self.agent_list[0].markov_matrix)
             if self.options.is_scheduled() and i % self.options.interaction_period == 0:
                 print("")
                 print("INTERACTION PERIOD")

@@ -60,6 +60,8 @@ with open('markov_test_500_iterations.csv', 'r') as sim_data_file:
 
 avg_markov_matrix = numpy.mean(all_final_markov_matrices, axis=0)
 
+print(avg_markov_matrix)
+
 options = heuristic_bursts.options.Options()
 
 # with open('markov_test_preloaded_matrix_500_iterations.csv', 'w') as sim_data_file:

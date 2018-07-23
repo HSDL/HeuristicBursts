@@ -9,7 +9,7 @@ num_iter = 500
 num_reps = 75
 max_allowed_qual = 3000
 
-with open('markov_test_500_iterations.csv', 'r') as sim_data_file:
+with open('markov_test_k05_500_iterations.csv', 'r') as sim_data_file:
     csv_reader = csv.DictReader(sim_data_file)
 
     valid_reps = []
@@ -50,7 +50,7 @@ with open('markov_test_500_iterations.csv', 'r') as sim_data_file:
 
     print(iter_err_a)
 
-with open('markov_test_lower_only_500_iterations.csv', 'r') as sim_data_file:
+with open('markov_test_500_iterations.csv', 'r') as sim_data_file:
     csv_reader = csv.DictReader(sim_data_file)
 
     valid_reps = []
@@ -91,7 +91,7 @@ with open('markov_test_lower_only_500_iterations.csv', 'r') as sim_data_file:
 
     print(iter_err_b)
 
-with open('markov_test_higher_only_500_iterations.csv', 'r') as sim_data_file:
+with open('markov_test_k25_500_iterations.csv', 'r') as sim_data_file:
     csv_reader = csv.DictReader(sim_data_file)
 
     valid_reps = []
@@ -133,7 +133,7 @@ with open('markov_test_higher_only_500_iterations.csv', 'r') as sim_data_file:
 
     print(iter_err_c)
 
-with open('markov_test_preloaded_matrix_500_iterations.csv', 'r') as sim_data_file:
+with open('both_tiers_500_iterations.csv', 'r') as sim_data_file:
     csv_reader = csv.DictReader(sim_data_file)
 
     valid_reps = []
@@ -185,10 +185,10 @@ plt.grid(color='g', linestyle='-', linewidth=0.25)
 plt.xlim((0, 500))
 # plt.legend((avg_iter_qual_a, avg_iter_qual_b, avg_iter_qual_c),("Lower-Tier Only", "Higher-Tier Only", "Lower-Tier Burst"), loc=4)
 # plt.plot(avg_iter_qual)
-plt.errorbar(numpy.arange(500), avg_iter_qual_a, yerr=iter_err_a, color='b', ecolor='b', elinewidth=0.25, label="Markov w/ Both Tiers")
-plt.errorbar(numpy.arange(500), avg_iter_qual_b, yerr=iter_err_b, color='g', ecolor='g', elinewidth=0.25, label="Markov w/ Lower Tier")
-plt.errorbar(numpy.arange(500), avg_iter_qual_c, yerr=iter_err_c, color='m', ecolor='m', elinewidth=0.25, label="Markov w/ Higher Tier")
-plt.errorbar(numpy.arange(500), avg_iter_qual_d, yerr=iter_err_d, color='y', ecolor='y', elinewidth=0.25, label="Markov w/ Preloaded Average Matrix")
+plt.errorbar(numpy.arange(500), avg_iter_qual_a, yerr=iter_err_a, color='b', ecolor='b', linewidth=2, elinewidth=0.25, label="Markov w/ Both Tiers (k=0.05)")
+plt.errorbar(numpy.arange(500), avg_iter_qual_b, yerr=iter_err_b, color='g', ecolor='g', linewidth=2, elinewidth=0.25, label="Markov w/ Both Tiers (k=0.10)")
+plt.errorbar(numpy.arange(500), avg_iter_qual_c, yerr=iter_err_c, color='m', ecolor='m', linewidth=2, elinewidth=0.25, label="Markov w/ Both Tiers (k=0.25)")
+plt.errorbar(numpy.arange(500), avg_iter_qual_d, yerr=iter_err_d, color='c', ecolor='c', linewidth=2, elinewidth=0.25, label="Random Selection w/ Both Tiers")
 plt.legend(loc=4)
 
 
