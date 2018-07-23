@@ -1,7 +1,3 @@
-[![Build Status](https://travis-ci.org/HSDL/HeuristicBursts.svg?branch=master)](https://travis-ci.org/HSDL/HeuristicBursts/)
-
-**Contributors:** {% for member in site.github.contributors %}<a href="{{member.html_url}}"><img src="{{member.avatar_url}}" width="32" height="32"></a>{% endfor %}
-
 ## Introduction
 Lorem ipsum dolor set amit.
 
@@ -12,5 +8,6 @@ Lorem ipsum dolor set amit.
 * [Two-Tier Language]()
 * [Applications]()
 
+
 ## Acknowledgements
-Lorem ipsum dolor set amit.
+This  material  is  based  upon  work  supported  by  the Defense Advanced   Research   Projects   Agency   through   cooperative agreement N66001-17-1-4064and  the  Air  Force  Office  of Scientific  Research  through  grant  number FA9550-18-1-0088. Any  opinions,  findings,  and  conclusions  or  recommendations expressed  in  this  paper  are  those  of  the  authors  and  do  not necessarily reflect the views of the sponsors.
