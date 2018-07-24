@@ -142,16 +142,24 @@ class Agent(object):
         # Calculate solution quality of current solution and candidate solution
         # self.current_solution_quality = sum([self.current_results[i] * self.weights[i] *
         # self.evaluation_adjustments[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
-        self.current_solution_quality = self.current_results[1]/self.current_results[0]
         # self.candidate_solution_quality = sum([self.candidate_results[i] * self.weights[i] *
         # self.evaluation_adjustments[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
+
+        # Used for WEC problem
+        self.current_solution_quality = self.current_results[1]/self.current_results[0]
         self.candidate_solution_quality = self.candidate_results[1]/self.candidate_results[0]
+
+        # Used for TRUSS problem
+        self.current_solution_quality = self.current_results[0] + pow(100*max(0, self.current_results[2] - min(self.current_results[1])), 2)
+        self.candidate_solution_quality = self.candidate_results[0] + pow(100*max(0, self.candidate_results[2] - min(self.candidate_results[1])), 2)
+
         print("current quality:", self.current_solution_quality)
         print("candidate quality:", self.candidate_solution_quality)
         print('')
 
         # Change in quality
-        d_quality = self.candidate_solution_quality - self.current_solution_quality
+        # d_quality = self.candidate_solution_quality - self.current_solution_quality
+        d_quality = 1
 
         # If quality shows candidate is better, accept candidate
         if d_quality > 0:
@@ -223,7 +231,12 @@ class Agent(object):
         self.simulation_data = self.team_all_simulation_data[solution_selected]
         # self.current_solution_quality = sum([self.current_results[i] * self.weights[i]
         # * self.evaluation_adjustments[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
+
+        # For WEC
         self.current_solution_quality = self.current_results[1]/self.current_results[0]
+
+        # For TRUSS
+        self.current_solution_quality = self.current_results[0] + pow(100*max(0, self.current_results[2] - min(self.current_results[1])), 2)
 
     def random_rule_select(self):
         # Probabilistically select rule tier based on preferences

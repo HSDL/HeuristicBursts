@@ -69,12 +69,13 @@ class Truss(AbstractBaseSolution):
             self.con_mat[member[0], member[1]] = 1.0
             self.con_mat[member[1], member[0]] = 1.0
 
+        # Target factor of safety
+        self.target_fos = 1.0
+
         # Evaluate the truss
         self.force = [0.0]
         self.fos = np.array([0.0])
         self.mass = 0.0
-        # self._build_init_script()
-        # self.stable = False
 
         # List of applied rules
         self.applied_rules = []
@@ -204,7 +205,7 @@ class Truss(AbstractBaseSolution):
         self.fos_eval()
         # self.quality_eval()
 
-        return [self.mass, self.fos]
+        return [self.mass, self.fos, self.target_fos]
 
     def mass_eval(self):
         """This function calculates the mass of the truss"""
@@ -219,7 +220,7 @@ class Truss(AbstractBaseSolution):
             self.mass += L[i]*self.WEIGHT[int(self.sizes[i])]
 
     def fos_eval(self):
-        support = np.array([[1, 1, 1], [0, 0, 1], [0, 1, 1], [0, 0, 1], [1, 1, 1]]).T
+        support = np.array([[1, 1, 1], [1, 1, 1]]).T
         self._single_fos_eval(support)
 
     def _single_fos_eval(self, support):
@@ -228,13 +229,19 @@ class Truss(AbstractBaseSolution):
         # Add the "Re"
         #         D["Re"] = array([[1, 1, 1], [0, 0, 1], [0, 1, 1], [0, 0, 1], [1, 1, 1]]).T
         D["Re"] = support
-        for _ in range(self.n - 5):
+        for _ in range(self.n - 2):
             D["Re"] = np.column_stack([D["Re"], [0, 0, 1]])
+
+        print("Re:")
+        print(D["Re"])
 
         # Add the appropriate loads
         D["Load"] = np.zeros([3, self.n])
-        D["Load"][1, 1] = -200000.0
-        D["Load"][1, 3] = -200000.0
+        # D["Load"][1, 2] = -200000.0
+        D["Load"][0, 2] = -1000000.0
+
+        print("Load:")
+        print(D["Load"])
 
         # Add the area information from truss structure
         D["A"] = []
@@ -244,13 +251,22 @@ class Truss(AbstractBaseSolution):
         D["Con"] = self.con.T
         D["E"] = self.E * np.ones(self.m)
 
+        print("A:")
+        print(D["A"])
+        print("Coord:")
+        print(D["Coord"])
+        print("Con:")
+        print(D["Con"])
+        print("E:")
+        print(D["E"])
+
         # Do force analysis
-        try:
-            self.force, U, R = self._force_eval(D)
-            self.stable = True
-        except np.linalg.LinAlgError:
-            self.force = np.ones(self.m) * pow(10, 16)
-            self.stable = False
+        # try:
+        self.force, U, R = self._force_eval(D)
+        self.stable = True
+        # except np.linalg.LinAlgError:
+        #     self.force = np.ones(self.m) * pow(10, 16)
+        #     self.stable = False
 
         # Calculate lengths
         L = np.zeros(self.m)
@@ -304,16 +320,21 @@ class Truss(AbstractBaseSolution):
         SSff = np.zeros([len(ff), len(ff)])
         for i in range(len(ff)):
             for j in range(len(ff)):
-                SSff[i,j] = SS[ff[i], ff[j]]
+                SSff[i, j] = SS[ff[i], ff[j]]
 
         Loadff = D["Load"].T.flat[ff]
+        print('ssff:')
+        print(SSff)
+        print('loadff:')
+        print(Loadff)
+        # TODO: FIGURE OUT WHY THIS FAILS
         Uff = np.linalg.solve(SSff, Loadff)
 
         ff = np.where(U.T==1)
         for i in range(len(ff[0])):
             U[ff[1][i], ff[0][i]] = Uff[i]
-        F = np.sum(np.multiply(Tj, U[:, D["Con"][1,:].astype(int)] - U[:, D["Con"][0,:].astype(int)]), axis=0)
-        if np.linalg.cond(SSff) > pow(10,10):
+        F = np.sum(np.multiply(Tj, U[:, D["Con"][1, :].astype(int)] - U[:, D["Con"][0, :].astype(int)]), axis=0)
+        if np.linalg.cond(SSff) > pow(10, 10):
             F *= pow(10, 10)
         R = np.sum(SS*U.T.flat[:], axis=1).reshape([w[1], w[0]]).T
 
@@ -442,13 +463,19 @@ class Truss(AbstractBaseSolution):
                 self.move_joint(j, d_coord)
 
     # HT rule 4
-    def replicate_pattern_rule(self, **kwargs):
-        pass
+    def replicate_pattern_rule(self, pattern):
+        new_joint_coord = pattern[0]
+        connecting_joint_a = pattern[1]
+        connecting_joint_b = pattern[2]
+        self.add_joint(new_joint_coord)
+        new_joint_index = len(self.coord)-1
+        self.add_member(connecting_joint_a, new_joint_index)
+        self.add_member(connecting_joint_b, new_joint_index)
 
     # HT rule 5
     def standardize_rule(self, standardization_rate, base_member):
         base_member_size = self.sizes[base_member]
-        for member_index in range(self.sizes):
+        for member_index in range(len(self.sizes)):
             member_size = self.sizes[member_index]
             size_change = standardization_rate*(base_member_size - member_size)
             self.change_member_size_rule(member_index, size_change)
@@ -524,6 +551,7 @@ class Truss(AbstractBaseSolution):
                 for j in range(len(self.con)):
                     a = self.coord[self.con[j][0]]
                     b = self.coord[self.con[j][1]]
+
                     if self.check_for_line_intersection(coord, test_node, a, b):
                         intersection = True
                 if not intersection:
@@ -570,8 +598,13 @@ class Truss(AbstractBaseSolution):
                 d_x = pow(-1,random.randint(1, 2))*random.uniform(min_coord_shift, max_coord_shift)
                 d_y = pow(-1,random.randint(1, 2))*random.uniform(min_coord_shift, max_coord_shift)
                 d_coord = [d_x, d_y, 0]
-            print(d_coord)
             self.move_free_joint_rule(joint, d_coord)
+            if not self.is_valid():
+                while not self.is_valid():
+                    d_x = pow(-1, random.randint(1, 2)) * random.uniform(min_coord_shift, max_coord_shift)
+                    d_y = pow(-1, random.randint(1, 2)) * random.uniform(min_coord_shift, max_coord_shift)
+                    d_coord = [d_x, d_y, 0]
+                    self.move_free_joint_rule(joint, d_coord)
             self.applied_rules.append('L6')
 
         # Resize member
@@ -631,7 +664,7 @@ class Truss(AbstractBaseSolution):
             if kwargs.get('scale_type') is not None:
                 scale_type = kwargs['scale_type']
             else:
-                scale_type_index = random.randint[0, 1]
+                scale_type_index = random.randint(0, 1)
                 if scale_type_index == 0:
                     scale_type = 'member size'
                 elif scale_type_index == 1:
@@ -641,7 +674,10 @@ class Truss(AbstractBaseSolution):
 
         # Replicate pattern
         elif rule == 4:
-            self.applied_rules.append('H4')
+            if len(self.patterns) > 0:
+                pattern = self.patterns[random.randint(0, len(self.patterns)-1)]
+                self.replicate_pattern_rule(pattern)
+                self.applied_rules.append('H4')
 
         # Standardize
         elif rule == 5:
@@ -714,7 +750,6 @@ class Truss(AbstractBaseSolution):
             for i in range(len(removable_list_sets)):
                 removable_list_sets[i] -= 1
 
-        # print('all joinable', self.joinable_sets)
         # Check joinable sets to see if there is collision with new members
         removable_list_sets = []
         for set_index in range(len(self.joinable_sets)):
@@ -733,6 +768,7 @@ class Truss(AbstractBaseSolution):
 
                 if not ((set[1] == con[0] and set[2] == con[1]) or (set[1] == con[1] and set[2] == con[0])):
                     intersection = self.check_for_line_intersection(node_a, node_b, node_c, node_d)
+                    # TODO: CHECK THIS!
                     if set[0] == con[0] or set[0] == con[1]:
                         intersection = False
                     if intersection:
@@ -816,15 +852,79 @@ class Truss(AbstractBaseSolution):
 
         # Check which patterns are valid
         self.patterns = []
-        self.potential_patterns = []
+        potential_patterns = []
         for i in range(len(self.con)):
             member = self.con[i]
             joint_a = member[0]
             joint_b = member[1]
             for j in range(len(self.con_mat)):
                 if self.con_mat[joint_a][j] == 1.0 and self.con_mat[joint_b][j] == 1.0:
-                    self.potential_patterns.append([joint_a, joint_b, j])
+                    potential_patterns.append([joint_a, joint_b, j])
+        # Identify locations of patterns
+        for i in range(len(potential_patterns)):
+            pattern = potential_patterns[i]
+            coord_a = self.coord[pattern[0]]
+            coord_b = self.coord[pattern[1]]
+            coord_c = self.coord[pattern[2]]
 
+            # Figure out coordinates of reflected point c
+            if coord_b[0] - coord_a[0] != 0 and coord_b[1] - coord_a[1] != 0:
+                m1 = (coord_b[1]-coord_a[1])/(coord_b[0]-coord_a[0])
+                b1 = coord_a[1] - m1*coord_a[0]
+                m2 = -1/m1
+                b2 = coord_c[1] - m2*coord_c[0]
+                x_int = (b2 - b1)/(m1-m2)
+                dx = coord_c[0] - x_int
+                x_new = x_int - dx
+                y_new = m2*x_new + b2
+            elif coord_b[1] - coord_a[1] == 0:
+                x_new = coord_c[0]
+                dy = coord_c[1] - coord_a[1]
+                y_new = coord_a[1] - dy
+            else:
+                dx = coord_c[0] - coord_a[0]
+                x_new = coord_a[0] - dx
+                y_new = coord_c[1]
+
+            coord_d = [x_new, y_new, 0]
+            self.patterns.append([coord_d, pattern[0], pattern[1]])
+
+        # Check patterns to see if there is any collisions with existing members
+        removable_list_patterns = []
+        for pattern_index in range(len(self.patterns)):
+            pattern = self.patterns[pattern_index]
+            new_node_coord = pattern[0]
+            node_a = self.coord[pattern[1]]
+            node_b = self.coord[pattern[2]]
+
+            for member in self.con:
+                node_c = self.coord[member[0]]
+                node_d = self.coord[member[1]]
+
+                intersection = self.check_for_line_intersection(new_node_coord, node_a, node_c, node_d)
+
+                # print('')
+                # print('new', new_node_coord)
+                # print('a', node_a)
+                # print('b', node_b)
+                # print('c', node_c)
+                # print('d', node_d)
+                # print('new/a', intersection)
+
+                if intersection:
+                    removable_list_patterns.append(pattern_index)
+                    break
+                else:
+                    intersection = self.check_for_line_intersection(new_node_coord, node_b, node_c, node_d)
+                    # print('new/b', intersection)
+                    if intersection:
+                        removable_list_patterns.append(pattern_index)
+                        break
+        while len(removable_list_patterns) > 0:
+            del self.patterns[removable_list_patterns[0]]
+            del removable_list_patterns[0]
+            for i in range(len(removable_list_patterns)):
+                removable_list_patterns[i] -= 1
 
     # Checks entire design to ensure design is valid
     def is_valid(self):
@@ -888,14 +988,17 @@ class Truss(AbstractBaseSolution):
             line_1 = self.line_creation(node_a, node_b)
             line_2 = self.line_creation(node_c, node_d)
             intersect = self.intersection(line_1, line_2)
-
             rounding_error = 0.000005
             if intersect is not False:
                 if self.is_between_values(intersect[0], node_a[0], node_b[0]) and self.is_between_values(intersect[1], node_a[1], node_b[1]) and self.is_between_values(intersect[0], node_c[0], node_d[0]) and self.is_between_values(intersect[1], node_c[1], node_d[1]):
                     if not ((self.is_between_values(intersect[0], node_a[0] - rounding_error, node_a[0] + rounding_error) and
                              self.is_between_values(intersect[1], node_a[1] - rounding_error, node_a[1] + rounding_error)) or
                             (self.is_between_values(intersect[0], node_b[0] - rounding_error, node_b[0] + rounding_error) and
-                             self.is_between_values(intersect[1], node_b[1] - rounding_error, node_b[1] + rounding_error))):
+                             self.is_between_values(intersect[1], node_b[1] - rounding_error, node_b[1] + rounding_error)) or
+                            (self.is_between_values(intersect[0], node_c[0] - rounding_error, node_c[0] + rounding_error) and
+                             self.is_between_values(intersect[1], node_c[1] - rounding_error, node_c[1] + rounding_error)) or
+                            (self.is_between_values(intersect[0], node_d[0] - rounding_error, node_d[0] + rounding_error) and
+                             self.is_between_values(intersect[1], node_d[1] - rounding_error, node_d[1] + rounding_error))):
                         do_intersect = True
         return do_intersect
 
@@ -923,7 +1026,7 @@ class Truss(AbstractBaseSolution):
     def is_between_values(self, num, a, b):
         minimum = min(a, b)
         maximum = max(a, b)
-        if minimum <= num <= maximum:
+        if minimum < num < maximum:
             is_between = True
         else:
             is_between = False
