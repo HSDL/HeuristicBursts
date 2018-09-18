@@ -19,7 +19,7 @@ class truss_visual():
     SCREEN_HEIGHT = 800
 
     # Scale multiplier
-    scale_multi = 25
+    scale_multi = 50
 
     def __init__(self):
         # initialize screen for displaying WEC design
@@ -38,7 +38,9 @@ class truss_visual():
 
         for index in range(len(design.con)):
             member = design.con[index]
-            size = design.sizes[index]
+            size = design.sizes[index]/10
+            if size < 1.0:
+                size = 1.0
 
             coordinates_a = design.coord[member[0]]
             coordinates_b = design.coord[member[1]]

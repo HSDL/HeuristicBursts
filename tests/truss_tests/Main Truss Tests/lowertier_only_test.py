@@ -10,15 +10,15 @@ import csv
 
 options = heuristic_bursts.options.Options()
 
-with open('lower_tier_only_500_iterations.csv', 'w') as sim_data_file:
-    fieldnames = ['repetition', 'iteration', 'rule tier', 'rule number', 'quality before rule', 'quality after rule',
-                  'current solution quality', 'rule acceptance', 'lower tier preference', 'higher tier preference',
-                  'error']
+# with open('lower_tier_only_500_iterations.csv', 'w') as sim_data_file:
+#     fieldnames = ['repetition', 'iteration', 'rule tier', 'rule number', 'quality before rule', 'quality after rule',
+#                   'current solution quality', 'rule acceptance', 'lower tier preference', 'higher tier preference',
+#                   'error', 'probability array', 'current solution mass', 'current solution min fos', 'current solution target fos']
+#
+#     csv_writer = csv.DictWriter(sim_data_file, fieldnames=fieldnames)
+#     csv_writer.writeheader()
 
-    csv_writer = csv.DictWriter(sim_data_file, fieldnames=fieldnames)
-    csv_writer.writeheader()
-
-for sim_num in range(0, 50):
+for sim_num in range(0, 25):
 
     # Instantiate team
     team = heuristic_bursts.team.Team(options)
@@ -56,4 +56,4 @@ for sim_num in range(0, 50):
             iteration_data[0] = last_rep + 1
             csv_writer.writerow(iteration_data)
 
-    team.display.wait_to_continue()
+    # team.display.wait_to_continue()

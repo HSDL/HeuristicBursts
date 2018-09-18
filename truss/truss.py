@@ -20,7 +20,7 @@ class Truss(AbstractBaseSolution):
     E = 210 * pow(10, 9)
 
     # Outer diameters of the optional sizes, in meters
-    OUTER_DIAM = [(x + 1.0) / 100 for x in range(10)]
+    OUTER_DIAM = [(x + 10.0) / 1000 for x in range(100)]
 
     # Thickness of the wall sections of optional sizes, in meters
     THICK = [d / 15 for d in OUTER_DIAM]
@@ -42,7 +42,7 @@ class Truss(AbstractBaseSolution):
         self.ej = np.zeros(100)
 
         # Create first set of nodal coordinates
-        self.coord = np.array([[0, 0, 0], [10, 0, 0], [5, 0, 0], [2.5, 5, 0], [7.5, 5, 0]])
+        self.coord = np.array([[0, 0, 0], [5, 0, 0], [2.5, 0, 0], [1.25, 3, 0], [3.75, 3, 0]])
 
         self.fixed_joints = [0, 1]
         self.force_joints = [2]
@@ -61,7 +61,7 @@ class Truss(AbstractBaseSolution):
         self.m = len(self.con)
 
         # Initialize truss sizes
-        self.sizes = np.ones(len(self.con)) * 4
+        self.sizes = np.ones(len(self.con)) * 50
 
         # Establish the connectivity matrix
         self.con_mat = np.zeros([self.n, self.n])
@@ -97,23 +97,23 @@ class Truss(AbstractBaseSolution):
         #         self.con_mat.resize(self.n, self.n)
         self.coord = np.vstack([self.coord, xy])
         b = [max(c) + 0.001 * min(c) for c in self.con]
-        if len(b) > 0:
-            ratio = float(len(b)) / float(len(np.unique(b)))
-            if ratio > 1.0:
-                print("Add Joint:" + str(ratio))
+        # if len(b) > 0:
+        #     ratio = float(len(b)) / float(len(np.unique(b)))
+        #     if ratio > 1.0:
+        #         print("Add Joint:" + str(ratio))
 
     def add_member(self, a, b):
         self.con = np.vstack([self.con, np.array([a, b])])
         self.con_mat[a, b] = 1.0
         self.con_mat[b, a] = 1.0
-        self.sizes = np.hstack([self.sizes, np.array(4.0)])
+        self.sizes = np.hstack([self.sizes, np.array(50.0)])
         self.m += 1
         d = [max(c) + 0.001 * min(c) for c in self.con]
-        if len(d) > 0:
-            ratio = float(len(d)) / float(len(np.unique(d)))
-            if ratio > 1.0:
-                print("Add Member 2:" + str(ratio))
-                print(len(self.con.T) / 2, sum(self.con_mat) / 2)
+        # if len(d) > 0:
+        #     ratio = float(len(d)) / float(len(np.unique(d)))
+        #     if ratio > 1.0:
+        #         print("Add Member 2:" + str(ratio))
+        #         print(len(self.con.T) / 2, sum(self.con_mat) / 2)
 
     def remove_joint(self, j):
         # Remove from coordinate list
@@ -139,10 +139,10 @@ class Truss(AbstractBaseSolution):
         # Decrement number of joints
         self.n -= 1
         b = [max(c) + 0.001 * min(c) for c in self.con]
-        if len(b) > 0:
-            ratio = float(len(b)) / float(len(np.unique(b)))
-            if ratio > 1.0:
-                print("Del Joint:" + str(ratio))
+        # if len(b) > 0:
+        #     ratio = float(len(b)) / float(len(np.unique(b)))
+        #     if ratio > 1.0:
+        #         print("Del Joint:" + str(ratio))
 
     def remove_member(self, j):
         self.con_mat[self.con[j, 1], self.con[j, 0]] = 0.0
@@ -151,25 +151,25 @@ class Truss(AbstractBaseSolution):
         self.sizes = np.delete(self.sizes, j)
         self.m -= 1
         b = [max(c) + 0.001 * min(c) for c in self.con]
-        if len(b) > 0:
-            ratio = float(len(b)) / float(len(np.unique(b)))
-            if ratio > 1.0:
-                print("Del Member:" + str(ratio))
+        # if len(b) > 0:
+        #     ratio = float(len(b)) / float(len(np.unique(b)))
+        #     if ratio > 1.0:
+        #         print("Del Member:" + str(ratio))
 
     def move_joint(self, j, dxy):
         self.coord[j, :] += dxy
         b = [max(c) + 0.001 * min(c) for c in self.con]
-        if len(b) > 0:
-            ratio = float(len(b)) / float(len(np.unique(b)))
-            if ratio > 1.0:
-                print("Move Joint:" + str(ratio))
+        # if len(b) > 0:
+        #     ratio = float(len(b)) / float(len(np.unique(b)))
+        #     if ratio > 1.0:
+        #         print("Move Joint:" + str(ratio))
 
     def change_member_size(self, j, dsize):
         self.sizes[j] += dsize
-        if self.sizes[j] > 9.0:
-            self.sizes[j] = 9.0
-        elif self.sizes[j] < 1.0:
-            self.sizes[j] = 1.0
+        if self.sizes[j] > 99.0:
+            self.sizes[j] = 99.0
+        elif self.sizes[j] < 0.0:
+            self.sizes[j] = 0.0
 
     #### NOT SURE WHAT THESE ARE FOR YET
     def joint_violation(self, i):
@@ -226,22 +226,14 @@ class Truss(AbstractBaseSolution):
     def _single_fos_eval(self, support):
         D = {}
 
-        # Add the "Re"
-        #         D["Re"] = array([[1, 1, 1], [0, 0, 1], [0, 1, 1], [0, 0, 1], [1, 1, 1]]).T
         D["Re"] = support
         for _ in range(self.n - 2):
             D["Re"] = np.column_stack([D["Re"], [0, 0, 1]])
 
-        print("Re:")
-        print(D["Re"])
-
         # Add the appropriate loads
         D["Load"] = np.zeros([3, self.n])
         # D["Load"][1, 2] = -200000.0
-        D["Load"][0, 2] = -1000000.0
-
-        print("Load:")
-        print(D["Load"])
+        D["Load"][1, 2] = -250000.0
 
         # Add the area information from truss structure
         D["A"] = []
@@ -251,22 +243,13 @@ class Truss(AbstractBaseSolution):
         D["Con"] = self.con.T
         D["E"] = self.E * np.ones(self.m)
 
-        print("A:")
-        print(D["A"])
-        print("Coord:")
-        print(D["Coord"])
-        print("Con:")
-        print(D["Con"])
-        print("E:")
-        print(D["E"])
-
         # Do force analysis
-        # try:
-        self.force, U, R = self._force_eval(D)
-        self.stable = True
-        # except np.linalg.LinAlgError:
-        #     self.force = np.ones(self.m) * pow(10, 16)
-        #     self.stable = False
+        try:
+            self.force, U, R = self._force_eval(D)
+            self.stable = True
+        except np.linalg.LinAlgError:
+            self.force = np.ones(self.m) * pow(10, 16)
+            self.stable = False
 
         # Calculate lengths
         L = np.zeros(self.m)
@@ -282,7 +265,7 @@ class Truss(AbstractBaseSolution):
                                   -self.fos[i])
 
         # Make sure loads and supports are connected
-        for i in range(5):
+        for i in range(3):
             if np.size(np.where(self.con == i)) == 0:
                 self.fos = np.zeros(self.m)
 
@@ -323,11 +306,7 @@ class Truss(AbstractBaseSolution):
                 SSff[i, j] = SS[ff[i], ff[j]]
 
         Loadff = D["Load"].T.flat[ff]
-        print('ssff:')
-        print(SSff)
-        print('loadff:')
-        print(Loadff)
-        # TODO: FIGURE OUT WHY THIS FAILS
+
         Uff = np.linalg.solve(SSff, Loadff)
 
         ff = np.where(U.T==1)
@@ -375,9 +354,10 @@ class Truss(AbstractBaseSolution):
 
     # LT rule 2
     def join_free_members_rule(self, set_to_join):
+        print('join:', set_to_join)
         self.remove_joint(set_to_join[0])
         if set_to_join[1] > set_to_join[0]:
-            set_to_join[0] -= 1
+            set_to_join[1] -= 1
         if set_to_join[2] > set_to_join[0]:
             set_to_join[2] -= 1
         self.add_member(set_to_join[1], set_to_join[2])
@@ -387,7 +367,8 @@ class Truss(AbstractBaseSolution):
         self.add_joint(coordinates)
         new_joint = len(self.coord) - 1
         for joint in connection_list:
-            self.add_member(joint, new_joint)
+            if joint != new_joint:
+                self.add_member(joint, new_joint)
 
     # LT rule 4
     def remove_free_joint_rule(self, joint_index):
@@ -451,8 +432,8 @@ class Truss(AbstractBaseSolution):
                 new_size = scale_multiplier*current_size
                 if new_size < 1.0:
                     new_size = 1.0
-                elif new_size > 9.0:
-                    new_size = 9.0
+                elif new_size > 99.0:
+                    new_size = 99.0
                 d_size = new_size - current_size
                 self.change_member_size(j, d_size)
         elif scale_type == 'joint position':
@@ -495,10 +476,10 @@ class Truss(AbstractBaseSolution):
         self.rule_check()
 
         max_new_dist = 3
-        min_size = 1.0
-        max_size = 9.0
-        min_coord_shift = 0.5
-        max_coord_shift = 2.0
+        min_size = 0.0
+        max_size = 99.0
+        min_coord_shift = 0.01
+        max_coord_shift = 1.0
 
         valid_rule = False
 
@@ -527,10 +508,10 @@ class Truss(AbstractBaseSolution):
             if kwargs.get('coord') is not None:
                 coord = kwargs['coord']
             else:
-                min_x = 50
-                max_x = -50
-                min_y = 50
-                max_y = -50
+                min_x = 10
+                max_x = -10
+                min_y = 10
+                max_y = -10
                 for joint in self.coord:
                     if joint[0] < min_x:
                         min_x = joint[0]
@@ -567,6 +548,7 @@ class Truss(AbstractBaseSolution):
                     joint = kwargs['joint']
                 else:
                     joint = self.deletable_joints[random.randint(0, len(self.deletable_joints)-1)]
+
                 self.remove_free_joint_rule(joint)
                 self.applied_rules.append('L4')
 
@@ -599,12 +581,16 @@ class Truss(AbstractBaseSolution):
                 d_y = pow(-1,random.randint(1, 2))*random.uniform(min_coord_shift, max_coord_shift)
                 d_coord = [d_x, d_y, 0]
             self.move_free_joint_rule(joint, d_coord)
+            attempts = 1
             if not self.is_valid():
                 while not self.is_valid():
-                    d_x = pow(-1, random.randint(1, 2)) * random.uniform(min_coord_shift, max_coord_shift)
-                    d_y = pow(-1, random.randint(1, 2)) * random.uniform(min_coord_shift, max_coord_shift)
+                    d_x = pow(-1, random.randint(1, 2)) * random.uniform(min_coord_shift, max_coord_shift) - d_coord[0]
+                    d_y = pow(-1, random.randint(1, 2)) * random.uniform(min_coord_shift, max_coord_shift) - d_coord[1]
                     d_coord = [d_x, d_y, 0]
                     self.move_free_joint_rule(joint, d_coord)
+                    attempts += 1
+                    if attempts > 100:
+                        break
             self.applied_rules.append('L6')
 
         # Resize member
@@ -617,7 +603,7 @@ class Truss(AbstractBaseSolution):
             if kwargs.get('size') is not None:
                 new_size = kwargs['size']
             else:
-                new_size = random.uniform(min_size, max_size)
+                new_size = random.randint(min_size, max_size)
 
             old_size = self.sizes[member]
             d_size = new_size - old_size
@@ -990,7 +976,10 @@ class Truss(AbstractBaseSolution):
             intersect = self.intersection(line_1, line_2)
             rounding_error = 0.000005
             if intersect is not False:
-                if self.is_between_values(intersect[0], node_a[0], node_b[0]) and self.is_between_values(intersect[1], node_a[1], node_b[1]) and self.is_between_values(intersect[0], node_c[0], node_d[0]) and self.is_between_values(intersect[1], node_c[1], node_d[1]):
+                if (self.is_between_values(intersect[0], node_a[0], node_b[0]) or intersect[0] == node_a[0])\
+                        and (self.is_between_values(intersect[1], node_a[1], node_b[1]) or intersect[1] == node_a[1])\
+                        and (self.is_between_values(intersect[0], node_c[0], node_d[0]) or intersect[0] == node_c[0])\
+                        and (self.is_between_values(intersect[1], node_c[1], node_d[1]) or intersect[1] == node_c[1]):
                     if not ((self.is_between_values(intersect[0], node_a[0] - rounding_error, node_a[0] + rounding_error) and
                              self.is_between_values(intersect[1], node_a[1] - rounding_error, node_a[1] + rounding_error)) or
                             (self.is_between_values(intersect[0], node_b[0] - rounding_error, node_b[0] + rounding_error) and

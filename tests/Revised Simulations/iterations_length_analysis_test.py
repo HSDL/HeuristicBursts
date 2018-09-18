@@ -198,7 +198,7 @@ plt.xlim((0, 500))
 plt.errorbar(numpy.arange(500), avg_iter_qual_a, yerr=iter_err_a, color='b', ecolor='b', linewidth=2, elinewidth=0.25, label=label_a)
 plt.errorbar(numpy.arange(500), avg_iter_qual_b, yerr=iter_err_b, color='g', ecolor='g', linewidth=2, elinewidth=0.25, label=label_b)
 plt.errorbar(numpy.arange(500), avg_iter_qual_c, yerr=iter_err_c, color='m', ecolor='m', linewidth=2, elinewidth=0.25, label=label_c)
-plt.errorbar(numpy.arange(500), avg_iter_qual_d, yerr=iter_err_d, color='c', ecolor='c', linewidth=2, elinewidth=0.25, label=label_d)
+plt.errorbar(numpy.arange(500), avg_iter_qual_d, yerr=iter_err_d, color='m', ecolor='c', linewidth=2, elinewidth=0.25, label=label_d)
 plt.legend(loc=4)
 
 

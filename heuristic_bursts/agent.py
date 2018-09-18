@@ -39,10 +39,10 @@ class Agent(object):
                                                   heuristic_bursts.solution.Solution.number_of_highertier_operations])
 
         # Instantiate weights for different rule tiers
-        self.rule = 2
-        self.last_rule = 2
-        self.preferred_rule_tier = 'high'
-        self.last_tier = 'high'
+        self.rule = 1
+        self.last_rule = 1
+        self.preferred_rule_tier = 'low'
+        self.last_tier = 'low'
         self.apply_lowtier_rule = False
         self.apply_hightier_rule = False
         self.tiers = ['low', 'high']
@@ -52,9 +52,9 @@ class Agent(object):
 
         # Initialize simulated annealing values for agent
         # self.TrikiParameter = 2.91*pow(10, -1)
-        self.TrikiParameter = 5.00 * pow(10, -7)
+        self.TrikiParameter = 2000
         # self.initial_temperature = 1.65*pow(10, -2)
-        self.initial_temperature = 0.002
+        self.initial_temperature = 500
         self.temperature = self.initial_temperature
         self.past_candidates_results = []
         self.candidate_variance = 1
@@ -65,7 +65,7 @@ class Agent(object):
 
         # Initialize Markov matrices
         self.markov_k = 0.05
-        self.num_lowtier_rules = 8
+        self.num_lowtier_rules = 7
         self.num_hightier_rules = 5
         self.markov_matrix = numpy.ones((self.num_lowtier_rules + self.num_hightier_rules, self.num_lowtier_rules + self.num_hightier_rules))
         self.markov_normal = numpy.ones((self.num_lowtier_rules + self.num_hightier_rules, self.num_lowtier_rules + self.num_hightier_rules))
@@ -98,8 +98,10 @@ class Agent(object):
 
         # Depending which tier the agent prefers in this iteration, implement one rule from that tier
         if self.apply_lowtier_rule:
+            print('LT:', self.rule)
             self.candidate_solution.lowtier_rule_perform(self.rule)
         elif self.apply_hightier_rule:
+            print('HT:', self.rule)
             self.candidate_solution.hightier_rule_perform(self.rule)
 
         # Deep copy the candidate to evaluate. Copying allows the candidate's position to be 'reset' after evaluation
@@ -125,12 +127,13 @@ class Agent(object):
 
         # ['repetition', 'iteration', 'rule tier', 'rule number', 'quality before rule', 'quality after rule',
         # 'current solution quality', 'rule acceptance', 'lower tier preference', 'higher tier preference',
-        # 'error', 'markov']
+        # 'error', 'markov', **'results']
         self.simulation_data.append([0, self.iteration_count, self.preferred_rule_tier, self.rule,
                                      self.previous_solution_quality, self.candidate_solution_quality,
                                      self.current_solution_quality, self.rule_accepted,
                                      self.tier_weights[0], self.tier_weights[1], self.error,
-                                     numpy.copy(self.previous_tier_preferred_selection_weights)])
+                                     numpy.copy(self.rule_probabilities), self.current_results[0],
+                                     min(self.current_results[1]), self.current_results[2]])
 
         self.iteration_count += 1
         self.tier_weights = (self.tier_weights[0] + self.tier_weight_change[0],
@@ -146,20 +149,20 @@ class Agent(object):
         # self.evaluation_adjustments[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
 
         # Used for WEC problem
-        self.current_solution_quality = self.current_results[1]/self.current_results[0]
-        self.candidate_solution_quality = self.candidate_results[1]/self.candidate_results[0]
+        # self.current_solution_quality = self.current_results[1]/self.current_results[0]
+        # self.candidate_solution_quality = self.candidate_results[1]/self.candidate_results[0]
 
         # Used for TRUSS problem
-        self.current_solution_quality = self.current_results[0] + pow(100*max(0, self.current_results[2] - min(self.current_results[1])), 2)
-        self.candidate_solution_quality = self.candidate_results[0] + pow(100*max(0, self.candidate_results[2] - min(self.candidate_results[1])), 2)
+        self.current_solution_quality = -self.current_results[0] - pow(100*max(0, self.current_results[2] - min(self.current_results[1])), 2)
+        self.candidate_solution_quality = -self.candidate_results[0] - pow(100*max(0, self.candidate_results[2] - min(self.candidate_results[1])), 2)
 
         print("current quality:", self.current_solution_quality)
         print("candidate quality:", self.candidate_solution_quality)
         print('')
 
         # Change in quality
-        # d_quality = self.candidate_solution_quality - self.current_solution_quality
-        d_quality = 1
+        d_quality = self.candidate_solution_quality - self.current_solution_quality
+        # d_quality = 1
 
         # If quality shows candidate is better, accept candidate
         if d_quality > 0:
@@ -233,10 +236,10 @@ class Agent(object):
         # * self.evaluation_adjustments[i] for i in range(heuristic_bursts.solution.Solution.number_of_metrics)])
 
         # For WEC
-        self.current_solution_quality = self.current_results[1]/self.current_results[0]
+        # self.current_solution_quality = self.current_results[1]/self.current_results[0]
 
         # For TRUSS
-        self.current_solution_quality = self.current_results[0] + pow(100*max(0, self.current_results[2] - min(self.current_results[1])), 2)
+        self.current_solution_quality = -self.current_results[0] - pow(100*max(0, self.current_results[2] - min(self.current_results[1])), 2)
 
     def random_rule_select(self):
         # Probabilistically select rule tier based on preferences

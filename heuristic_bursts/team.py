@@ -2,7 +2,8 @@ import heuristic_bursts.agent
 import copy
 
 # TODO: DELETE THIS
-import wec.wec_visual
+# import wec.wec_visual
+import truss.truss_visual
 
 
 class Team(object):
@@ -19,7 +20,8 @@ class Team(object):
         for i in range(self.options.number_of_agents):
             self.agent_list.append(heuristic_bursts.agent.Agent(self.options))
 
-        self.display = wec.wec_visual.wec_visual()
+        # self.display = wec.wec_visual.wec_visual()
+        # self.display = truss.truss_visual.truss_visual()
 
     def run(self):
         for i in range(1, self.options.number_of_iterations + 1):
@@ -32,7 +34,7 @@ class Team(object):
                 print("INTERACTION PERIOD")
                 print("")
                 self.interact()
-            self.display.display(self.agent_list[0].current_solution)
+            # self.display.display(self.agent_list[0].current_solution)
 
     def iterate(self):
         for agent in self.agent_list:
@@ -51,8 +53,8 @@ class Team(object):
             self.current_qualities.append(agent.current_solution_quality)
             self.all_qualities.append(agent.all_solution_qualities)
             self.all_simulation_data.append(agent.simulation_data)
-            print(agent.current_results)
-        print('')
+            # print(agent.current_results)
+        # print('')
 
         # Share those solutions
         for agent in self.agent_list:

@@ -10,7 +10,7 @@ import csv
 
 options = heuristic_bursts.options.Options()
 
-# with open('both_tiers_500_iterations.csv', 'w') as sim_data_file:
+# with open('random_walk_both_tiers_50_iterations.csv', 'w') as sim_data_file:
 #     fieldnames = ['repetition', 'iteration', 'rule tier', 'rule number', 'quality before rule', 'quality after rule',
 #                   'current solution quality', 'rule acceptance', 'lower tier preference', 'higher tier preference',
 #                   'error']
@@ -41,7 +41,7 @@ for sim_num in range(0, 50):
     all_qualities = team.agent_list[0].all_solution_qualities
     simulation_data = team.agent_list[0].simulation_data
 
-    with open('both_tiers_500_iterations.csv', 'r') as sim_data_file:
+    with open('random_walk_both_tiers_50_iterations.csv', 'r') as sim_data_file:
         csv_reader = csv.DictReader(sim_data_file)
 
         last_rep = -1
@@ -49,7 +49,7 @@ for sim_num in range(0, 50):
         for row in csv_reader:
             last_rep = int(row['repetition'])
 
-    with open('both_tiers_500_iterations.csv', 'a') as sim_data_file:
+    with open('random_walk_both_tiers_50_iterations.csv', 'a') as sim_data_file:
         csv_writer = csv.writer(sim_data_file)
 
         for iteration_data in simulation_data:
